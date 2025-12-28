@@ -4,6 +4,158 @@ Multi-agent startup idea validator using Claude CLI instances.
 
 Unlike traditional agent frameworks (CrewAI, LangChain), this project runs each agent as a **real Claude Code CLI instance**, leveraging the full power of Claude's capabilities including web search, file operations, and tool use.
 
+## Architecture
+
+The Ideation-Claude system uses a multi-agent orchestration pattern to evaluate startup ideas through multiple specialized phases:
+
+```mermaid
+graph TB
+    subgraph "CLI Interface"
+        CLI[ideation-claude CLI]
+    end
+    
+    subgraph "Orchestration Layer"
+        ORCH[IdeationOrchestrator]
+        SUB[SubAgentOrchestrator]
+    end
+    
+    subgraph "Evaluation Pipeline"
+        PHASE1[Phase 1: Market Research]
+        PHASE2[Phase 2: Competitive Analysis]
+        PHASE3[Phase 3: Market Sizing]
+        PHASE4[Phase 4: Technical Feasibility]
+        PHASE5[Phase 5: Lean Startup]
+        PHASE6[Phase 6: Mom Test]
+        PHASE7[Phase 7: Scoring]
+        PHASE8[Phase 8: Pivot Suggestions]
+    end
+    
+    subgraph "Agents"
+        AGENT1[Market Research Agent]
+        AGENT2[Competitive Analysis Agent]
+        AGENT3[Market Sizing Agent]
+        AGENT4[Technical Feasibility Agent]
+        AGENT5[Lean Startup Agent]
+        AGENT6[Mom Test Agent]
+        AGENT7[Scoring Agent]
+        AGENT8[Pivot Agent]
+    end
+    
+    subgraph "Memory & Context"
+        MEM0[Mem0 Memory Service]
+        CONTEXT[Past Evaluations<br/>Phase Outputs<br/>Market Insights]
+    end
+    
+    subgraph "Monitoring"
+        MONITOR[PipelineMonitor]
+        METRICS[Evaluation Metrics<br/>Phase Metrics<br/>JSON Export]
+    end
+    
+    CLI --> ORCH
+    CLI --> SUB
+    ORCH --> PHASE1
+    ORCH --> PHASE2
+    ORCH --> PHASE3
+    ORCH --> PHASE4
+    ORCH --> PHASE5
+    ORCH --> PHASE6
+    ORCH --> PHASE7
+    ORCH --> PHASE8
+    
+    PHASE1 --> AGENT1
+    PHASE2 --> AGENT2
+    PHASE3 --> AGENT3
+    PHASE4 --> AGENT4
+    PHASE5 --> AGENT5
+    PHASE6 --> AGENT6
+    PHASE7 --> AGENT7
+    PHASE8 --> AGENT8
+    
+    AGENT1 --> MEM0
+    AGENT2 --> MEM0
+    AGENT3 --> MEM0
+    AGENT4 --> MEM0
+    AGENT5 --> MEM0
+    AGENT6 --> MEM0
+    AGENT7 --> MEM0
+    AGENT8 --> MEM0
+    
+    MEM0 --> CONTEXT
+    CONTEXT --> AGENT1
+    CONTEXT --> AGENT2
+    CONTEXT --> AGENT3
+    CONTEXT --> AGENT4
+    CONTEXT --> AGENT5
+    CONTEXT --> AGENT6
+    CONTEXT --> AGENT7
+    CONTEXT --> AGENT8
+    
+    ORCH --> MONITOR
+    MONITOR --> METRICS
+    
+    PHASE1 --> MEM0
+    PHASE2 --> MEM0
+    PHASE3 --> MEM0
+    PHASE4 --> MEM0
+    PHASE5 --> MEM0
+    PHASE6 --> MEM0
+    PHASE7 --> MEM0
+    PHASE8 --> MEM0
+    
+    style CLI fill:#e1f5ff
+    style ORCH fill:#fff4e1
+    style SUB fill:#fff4e1
+    style MEM0 fill:#e8f5e9
+    style MONITOR fill:#f3e5f5
+    style METRICS fill:#f3e5f5
+```
+
+### Architecture Components
+
+**CLI Interface (`main.py`)**
+- Entry point for user interactions
+- Handles argument parsing and command routing
+- Supports manual evaluation, batch processing, and interactive mode
+
+**Orchestration Layer**
+- **IdeationOrchestrator**: Direct SDK mode - orchestrates agents sequentially
+- **SubAgentOrchestrator**: Sub-agent mode - single coordinator spawns specialized sub-agents
+- Manages pipeline state, phase transitions, and result aggregation
+
+**Evaluation Pipeline (8 Phases)**
+1. **Market Research**: Industry trends, market dynamics
+2. **Competitive Analysis**: Competitor landscape, differentiation
+3. **Market Sizing**: TAM/SAM/SOM calculations
+4. **Technical Feasibility**: Technology requirements, implementation complexity
+5. **Lean Startup**: Hypothesis extraction, validation approach
+6. **Mom Test**: Customer discovery planning, interview strategies
+7. **Scoring**: 8-criteria evaluation (1-10 scale)
+8. **Pivot Suggestions**: Alternative directions for eliminated ideas
+
+**Memory Service (Mem0)**
+- Stores all evaluated ideas and their outcomes
+- Maintains phase-level outputs for context
+- Provides market insights and similar idea detection
+- Supports pending ideas queue for batch processing
+
+**Monitoring System**
+- Real-time progress tracking with `rich` library
+- Phase-level metrics collection
+- Evaluation-level aggregation
+- JSON export for analysis
+
+### Data Flow
+
+1. **Input**: User provides idea(s) via CLI or GitHub Actions
+2. **Orchestration**: Orchestrator initializes pipeline state
+3. **Phase Execution**: Each phase runs its specialized agent
+4. **Context Retrieval**: Agents query Mem0 for relevant past evaluations
+5. **Agent Execution**: Claude Code CLI agents perform analysis
+6. **Memory Storage**: Phase outputs saved to Mem0
+7. **Scoring**: Final score calculated from 8 criteria
+8. **Decision**: Idea passes (score ≥ threshold) or is eliminated
+9. **Output**: Report generated with full analysis and recommendations
+
 ## Features
 
 - **9 Specialized Agents**: Each with a specific role in the validation pipeline
