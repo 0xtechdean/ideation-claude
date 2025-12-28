@@ -351,7 +351,7 @@ class PipelineMonitor:
 
     def __enter__(self):
         """Context manager entry."""
-        if self.verbose and self.progress:
+        if self.verbose and RICH_AVAILABLE and self.progress:
             self.live = Live(self.progress, console=self.console, refresh_per_second=10)
             self.live.__enter__()
         return self

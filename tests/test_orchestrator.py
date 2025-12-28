@@ -135,7 +135,7 @@ async def test_evaluate_idea(mock_claude_query, mock_env_vars):
         mock_instance.run_pipeline = AsyncMock(return_value=mock_result)
         mock_orch.return_value = mock_instance
         
-        result = await evaluate_idea("Test Idea", threshold=5.0, verbose=False)
+        result = await evaluate_idea("Test Idea", threshold=5.0, verbose=False, monitor=None)
         
         assert result.topic == "Test Idea"
         assert result.total_score == 6.0

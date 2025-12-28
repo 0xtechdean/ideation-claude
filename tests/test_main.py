@@ -39,9 +39,10 @@ class TestCLI:
                 output=None,
                 verbose=False,
                 subagent=False,
+                metrics=False,
             )
             
-            mock_eval.assert_called_once_with("Test Idea", 5.0, False)
+            mock_eval.assert_called_once_with("Test Idea", 5.0, False, None)
 
     @pytest.mark.asyncio
     async def test_run_evaluation_multiple_ideas(self):
@@ -61,6 +62,7 @@ class TestCLI:
                 output=None,
                 verbose=False,
                 subagent=False,
+                metrics=False,
             )
             
             mock_eval.assert_called_once_with(["Idea 1", "Idea 2"], 5.0, False)
@@ -84,6 +86,7 @@ class TestCLI:
                 output=None,
                 verbose=False,
                 subagent=True,
+                metrics=False,
             )
             
             mock_eval.assert_called_once_with("Test Idea", 5.0, False)
@@ -108,6 +111,7 @@ class TestCLI:
                 output=str(output_file),
                 verbose=False,
                 subagent=False,
+                metrics=False,
             )
             
             assert output_file.exists()
