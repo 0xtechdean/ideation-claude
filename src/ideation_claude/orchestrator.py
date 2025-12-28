@@ -376,6 +376,13 @@ If the average score < {self.state.threshold}, mark as ELIMINATED.
         result.problem_eliminated = self._is_eliminated(result.problem_scoring_text)
         result.problem_validated = not result.problem_eliminated
         
+        # Generate and save problem validation summary
+        if self.memory:
+            problem_validation_summary = f"Problem validation completed. Score: {result.problem_score}/10. Status: {'VALIDATED' if result.problem_validated else 'ELIMINATED'}. Key findings from research, market sizing, and customer discovery phases."
+            self.memory.save_phase_summary(problem, "problem_validation", problem_validation_summary)
+            if verbose and not monitor:
+                log(f"📝 Problem validation summary saved to memory")
+        
         if monitor:
             monitor.complete_phase(Phase.SCORING, api_calls=1)
         
