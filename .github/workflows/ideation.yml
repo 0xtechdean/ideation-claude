@@ -147,7 +147,38 @@ jobs:
             # Manual trigger
             IDEAS_FILE="${{ github.event.inputs.ideas_file }}"
             
-            if [ -n "$IDEAS_FILE" ] && [ -f "$IDEAS_FILE" ]; then
+            if [ -n "$IDEAS_FILE" ] && [ "$IDEAS_FILE" = "mem0" ]; then
+              # Use Mem0 pending ideas
+              echo "::group::📝 Reading pending ideas from Mem0"
+              IDEAS=$(ideation-claude pending --limit 100 2>&1 | grep -E "^\s+[0-9]+\." | sed 's/^[[:space:]]*[0-9]*\. //' || echo "")
+              if [ -n "$IDEAS" ]; then
+                IDEA_COUNT=$(echo "$IDEAS" | wc -l)
+                echo "Total pending ideas: $IDEA_COUNT"
+                echo "$IDEAS" | while IFS= read -r idea; do
+                  [ -z "$idea" ] && continue
+                  echo "  - $idea"
+                done
+                echo "::endgroup::"
+                
+                IDEA_NUM=0
+                echo "$IDEAS" | while IFS= read -r idea; do
+                  [ -z "$idea" ] && continue
+                  IDEA_NUM=$((IDEA_NUM + 1))
+                  echo "::group::💡 Evaluating Idea $IDEA_NUM/$IDEA_COUNT: $idea"
+                  OUTPUT_FILE="reports/$(echo "$idea" | tr ' ' '_' | tr -cd '[:alnum:]_').md"
+                  if [ "${{ github.event.inputs.subagent }}" = "true" ]; then
+                    ideation-claude $QUIET_FLAG $METRICS_FLAG --subagent --threshold ${{ github.event.inputs.threshold }} "$idea" -o "$OUTPUT_FILE"
+                  else
+                    ideation-claude $QUIET_FLAG $METRICS_FLAG --threshold ${{ github.event.inputs.threshold }} "$idea" -o "$OUTPUT_FILE"
+                  fi
+                  echo "✓ Report saved: $OUTPUT_FILE"
+                  echo "::endgroup::"
+                done
+              else
+                echo "::warning::No pending ideas found in Mem0"
+                exit 0
+              fi
+            elif [ -n "$IDEAS_FILE" ] && [ -f "$IDEAS_FILE" ]; then
               # Use specified ideas file
               echo "::group::📝 Reading ideas from file: $IDEAS_FILE"
               IDEA_COUNT=0
@@ -202,16 +233,20 @@ jobs:
               done
             fi
           else
-            # Scheduled or push trigger - use default ideas file
-            IDEAS_FILE=".github/ideas.txt"
-            if [ -f "$IDEAS_FILE" ]; then
-              echo "::group::📝 Reading ideas from: $IDEAS_FILE"
-              IDEA_COUNT=$(grep -v '^[[:space:]]*$' "$IDEAS_FILE" | wc -l)
-              echo "Total ideas: $IDEA_COUNT"
+            # Scheduled or push trigger - use Mem0 pending ideas
+            echo "::group::📝 Reading pending ideas from Mem0"
+            IDEAS=$(ideation-claude pending --limit 100 2>&1 | grep -E "^\s+[0-9]+\." | sed 's/^[[:space:]]*[0-9]*\. //' || echo "")
+            if [ -n "$IDEAS" ]; then
+              IDEA_COUNT=$(echo "$IDEAS" | wc -l)
+              echo "Total pending ideas: $IDEA_COUNT"
+              echo "$IDEAS" | while IFS= read -r idea; do
+                [ -z "$idea" ] && continue
+                echo "  - $idea"
+              done
               echo "::endgroup::"
               
               IDEA_NUM=0
-              while IFS= read -r idea; do
+              echo "$IDEAS" | while IFS= read -r idea; do
                 [ -z "$idea" ] && continue
                 IDEA_NUM=$((IDEA_NUM + 1))
                 echo "::group::💡 Evaluating Idea $IDEA_NUM/$IDEA_COUNT: $idea"
@@ -219,10 +254,31 @@ jobs:
                 ideation-claude --quiet --metrics "$idea" -o "$OUTPUT_FILE"
                 echo "✓ Report saved: $OUTPUT_FILE"
                 echo "::endgroup::"
-              done < "$IDEAS_FILE"
+              done
             else
-              echo "::error::No ideas.txt file found. Create .github/ideas.txt with one idea per line."
-              exit 1
+              # Fallback to ideas.txt if no pending ideas in Mem0
+              IDEAS_FILE=".github/ideas.txt"
+              if [ -f "$IDEAS_FILE" ]; then
+                echo "::group::📝 No pending ideas in Mem0, reading from: $IDEAS_FILE"
+                IDEA_COUNT=$(grep -v '^[[:space:]]*$' "$IDEAS_FILE" | wc -l)
+                echo "Total ideas: $IDEA_COUNT"
+                echo "::endgroup::"
+                
+                IDEA_NUM=0
+                while IFS= read -r idea; do
+                  [ -z "$idea" ] && continue
+                  IDEA_NUM=$((IDEA_NUM + 1))
+                  echo "::group::💡 Evaluating Idea $IDEA_NUM/$IDEA_COUNT: $idea"
+                  OUTPUT_FILE="reports/$(echo "$idea" | tr ' ' '_' | tr -cd '[:alnum:]_').md"
+                  ideation-claude --quiet --metrics "$idea" -o "$OUTPUT_FILE"
+                  echo "✓ Report saved: $OUTPUT_FILE"
+                  echo "::endgroup::"
+                done < "$IDEAS_FILE"
+              else
+                echo "::warning::No pending ideas in Mem0 and no ideas.txt file found."
+                echo "Add ideas with: ideation-claude add \"Your idea\""
+                exit 0
+              fi
             fi
           fi
           
