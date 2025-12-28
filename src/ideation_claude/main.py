@@ -15,7 +15,6 @@ from .orchestrator_subagent import evaluate_with_subagents
 
 
 @click.group(invoke_without_command=True)
-@click.argument("topics", nargs=-1)
 @click.option(
     "--threshold",
     "-t",
@@ -53,8 +52,9 @@ from .orchestrator_subagent import evaluate_with_subagents
     is_flag=True,
     help="Save detailed metrics to JSON file",
 )
+@click.argument("topics", nargs=-1)
 @click.pass_context
-def cli(ctx, topics, threshold, output, interactive, quiet, subagent, metrics):
+def cli(ctx, threshold, output, interactive, quiet, subagent, metrics, topics):
     """Ideation-Claude: Multi-agent startup idea validator.
 
     Evaluate startup ideas using Claude CLI agents that perform:
