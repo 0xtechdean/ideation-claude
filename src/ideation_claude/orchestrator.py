@@ -142,6 +142,47 @@ class IdeationOrchestrator:
 
         return "\n".join(result_parts)
 
+    async def _generate_phase_summary(
+        self,
+        phase_name: str,
+        phase_output: str,
+        problem: str,
+    ) -> str:
+        """Generate a concise summary of what happened in a phase.
+
+        Args:
+            phase_name: Name of the phase (e.g., "research", "market_sizing")
+            phase_output: The full output from the phase
+            problem: The problem statement being evaluated
+
+        Returns:
+            A concise summary of the phase
+        """
+        summary_prompt = f"""Generate a concise summary (2-3 sentences) of what was discovered in the {phase_name} phase for this problem: {problem}
+
+Phase Output:
+{phase_output[:3000]}
+
+Provide a brief summary focusing on:
+- Key findings
+- Important insights
+- Critical information discovered
+
+Keep it concise and actionable."""
+        
+        try:
+            summary = await self._run_agent(
+                "report_generator",  # Use report generator for summarization
+                summary_prompt,
+                allowed_tools=[],
+            )
+            # Extract just the summary text (first few sentences)
+            summary_lines = summary.split('\n')[:5]
+            return '\n'.join(summary_lines).strip()
+        except Exception as e:
+            # Fallback to a simple extraction if summarization fails
+            return f"Phase {phase_name} completed. Key findings: {phase_output[:500]}..."
+
     def _extract_score(self, scoring_text: str) -> float:
         """Extract the total score from scoring output."""
         # Look for various patterns the agents might use
@@ -227,6 +268,11 @@ class IdeationOrchestrator:
         # Store research insights in memory
         if self.memory:
             self.memory.save_phase_output(problem, "research", result.research_insights)
+            # Generate and save phase summary
+            research_summary = await self._generate_phase_summary("research", result.research_insights, problem)
+            self.memory.save_phase_summary(problem, "research", research_summary)
+            if verbose and not monitor:
+                log(f"📝 Research summary: {research_summary[:150]}...")
         
         if monitor:
             monitor.complete_phase(Phase.RESEARCH, api_calls=1)
@@ -245,6 +291,11 @@ class IdeationOrchestrator:
         
         if self.memory:
             self.memory.save_phase_output(problem, "market_sizing", result.market_sizing)
+            # Generate and save phase summary
+            market_summary = await self._generate_phase_summary("market_sizing", result.market_sizing, problem)
+            self.memory.save_phase_summary(problem, "market_sizing", market_summary)
+            if verbose and not monitor:
+                log(f"📝 Market sizing summary: {market_summary[:150]}...")
         
         if monitor:
             monitor.complete_phase(Phase.MARKET_SIZING, api_calls=1)
@@ -267,6 +318,11 @@ class IdeationOrchestrator:
         
         if self.memory:
             self.memory.save_phase_output(problem, "customer_discovery", result.customer_discovery)
+            # Generate and save phase summary
+            customer_summary = await self._generate_phase_summary("customer_discovery", result.customer_discovery, problem)
+            self.memory.save_phase_summary(problem, "customer_discovery", customer_summary)
+            if verbose and not monitor:
+                log(f"📝 Customer discovery summary: {customer_summary[:150]}...")
         
         if monitor:
             monitor.complete_phase(Phase.CUSTOMER_DISCOVERY, api_calls=1)
@@ -434,6 +490,11 @@ If the average score < {self.state.threshold}, mark as ELIMINATED.
         
         if self.memory:
             self.memory.save_phase_output(problem, "competitor_analysis", solution_result.competitor_analysis)
+            # Generate and save phase summary
+            competitor_summary = await self._generate_phase_summary("competitor_analysis", solution_result.competitor_analysis, problem)
+            self.memory.save_phase_summary(problem, "competitor_analysis", competitor_summary)
+            if verbose and not monitor:
+                log(f"📝 Competitor analysis summary: {competitor_summary[:150]}...")
         
         if monitor:
             monitor.complete_phase(Phase.COMPETITOR_ANALYSIS, api_calls=1)
@@ -454,6 +515,11 @@ If the average score < {self.state.threshold}, mark as ELIMINATED.
         
         if self.memory:
             self.memory.save_phase_output(problem, "resource_findings", solution_result.resource_findings)
+            # Generate and save phase summary
+            resource_summary = await self._generate_phase_summary("resource_findings", solution_result.resource_findings, problem)
+            self.memory.save_phase_summary(problem, "resource_findings", resource_summary)
+            if verbose and not monitor:
+                log(f"📝 Resource findings summary: {resource_summary[:150]}...")
         
         if monitor:
             monitor.complete_phase(Phase.RESOURCE_SCOUT, api_calls=1)
@@ -483,6 +549,11 @@ Solution Context:
         
         if self.memory:
             self.memory.save_phase_output(problem, "hypothesis", solution_result.hypothesis)
+            # Generate and save phase summary
+            hypothesis_summary = await self._generate_phase_summary("hypothesis", solution_result.hypothesis, problem)
+            self.memory.save_phase_summary(problem, "hypothesis", hypothesis_summary)
+            if verbose and not monitor:
+                log(f"📝 Hypothesis summary: {hypothesis_summary[:150]}...")
         
         if monitor:
             monitor.complete_phase(Phase.HYPOTHESIS, api_calls=1)
@@ -535,6 +606,13 @@ If the average score < {self.state.threshold}, mark as ELIMINATED.
         solution_result.solution_score = self._extract_score(solution_result.solution_scoring_text)
         solution_result.solution_eliminated = self._is_eliminated(solution_result.solution_scoring_text)
         solution_result.solution_validated = not solution_result.solution_eliminated
+        
+        # Generate and save solution validation summary
+        if self.memory:
+            solution_validation_summary = f"Solution validation completed. Score: {solution_result.solution_score}/10. Status: {'VALIDATED' if solution_result.solution_validated else 'ELIMINATED'}. Key findings from competitor analysis, resource assessment, and hypothesis definition."
+            self.memory.save_phase_summary(problem, "solution_validation", solution_validation_summary)
+            if verbose and not monitor:
+                log(f"📝 Solution validation summary saved to memory")
         
         # Combine problem and solution scores (weighted: 60% problem, 40% solution)
         results.total_score = (problem_result.problem_score * 0.6) + (solution_result.solution_score * 0.4)

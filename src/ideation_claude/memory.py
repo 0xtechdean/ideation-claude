@@ -279,6 +279,48 @@ Output:
         )
         return result.get("id", "unknown")
 
+    def save_phase_summary(
+        self,
+        topic: str,
+        phase: str,
+        summary: str,
+        metadata: Optional[dict] = None,
+    ) -> str:
+        """Save a phase summary to memory.
+
+        Args:
+            topic: The problem/idea being evaluated
+            phase: Phase name (research, competitor_analysis, market_sizing, etc.)
+            summary: The phase summary content
+            metadata: Additional metadata to store
+
+        Returns:
+            Memory ID
+        """
+        memory_text = f"""
+Phase Summary: {phase}
+Problem/Topic: {topic}
+Date: {datetime.now().isoformat()}
+
+Summary:
+{summary}
+"""
+        meta = {
+            "type": "phase_summary",
+            "phase": phase,
+            "topic": topic,
+            "timestamp": datetime.now().isoformat(),
+        }
+        if metadata:
+            meta.update(metadata)
+        
+        result = self.memory.add(
+            memory_text,
+            user_id=self.user_id,
+            metadata=meta
+        )
+        return result.get("id", "unknown")
+
     def get_market_insights(self, query: str, limit: int = 5) -> list[dict]:
         """Get market insights from past evaluations.
 
