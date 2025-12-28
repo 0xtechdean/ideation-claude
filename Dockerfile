@@ -12,8 +12,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY pyproject.toml ./
 COPY src/ ./src/
 
-# Install the package
-RUN pip install --no-cache-dir --user -e .
+# Install the package with all dependencies
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir --user -e ".[test]"
 
 # Final stage
 FROM python:3.10-slim
