@@ -45,4 +45,5 @@ Thumbs.db
 # Output
 output/
 context/
+reports/
 *.log

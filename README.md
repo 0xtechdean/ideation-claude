@@ -188,6 +188,83 @@ ideation-claude/
 └── .env.example
 ```
 
+## GitHub Actions Integration
+
+This project includes a GitHub Actions workflow that allows you to run evaluations automatically or on-demand.
+
+### Setup
+
+1. **Add Secrets to GitHub Repository:**
+   - Go to your repository → Settings → Secrets and variables → Actions
+   - Add the following secrets:
+     - `ANTHROPIC_API_KEY`: Your Anthropic API key (required)
+     - `MEM0_API_KEY`: Your Mem0 API key (optional)
+     - `OPENAI_API_KEY`: Your OpenAI API key (optional, for local Mem0)
+
+2. **Workflow Triggers:**
+   - **Manual Trigger**: Go to Actions → "Ideation Claude Evaluation" → Run workflow
+     - Enter your startup idea
+     - Set threshold (default: 5.0)
+     - Choose orchestrator mode (direct SDK or sub-agent)
+   - **Scheduled**: Runs daily at 2 AM UTC (configurable in `.github/workflows/ideation.yml`)
+   - **On Push**: Automatically runs when code changes are pushed to `main`
+
+3. **Batch Evaluation:**
+   - Create `.github/ideas.txt` with one idea per line
+   - The workflow will evaluate all ideas and generate reports
+   - Reports are saved as artifacts and can be downloaded
+
+### Example Workflow Usage
+
+```yaml
+# Manual trigger via GitHub UI
+# Or use GitHub CLI:
+gh workflow run ideation.yml -f idea="AI-powered legal research assistant" -f threshold=6.0
+```
+
+### Workflow Features
+
+- ✅ Automatic Python environment setup
+- ✅ Dependency installation
+- ✅ Secure secret management
+- ✅ Report artifact generation
+- ✅ PR comment integration (for pull requests)
+- ✅ Support for both orchestrator modes
+
+### Privacy Considerations for Public Repositories
+
+⚠️ **Important**: In public repositories, GitHub Actions workflow runs are **visible to everyone** by default. This means:
+
+- Your startup ideas (workflow inputs) are visible in the Actions tab
+- Evaluation results and logs are publicly accessible
+- Artifacts may be visible (depending on settings)
+
+**Solutions:**
+
+1. **Use Private Workflow** (Recommended for sensitive ideas):
+   - Use `.github/workflows/ideation-private.yml` instead
+   - Only supports manual triggers (no scheduled/push triggers)
+   - Artifacts auto-delete after 1 day
+   - Still visible in public repos, but less likely to be discovered
+
+2. **Use a Private Repository**:
+   - Fork this repo to a private repository
+   - Run evaluations there
+   - Keep the public repo for code sharing only
+
+3. **Run Locally**:
+   - Use the CLI directly on your machine
+   - No workflow runs = no public visibility
+   - Best option for highly sensitive ideas
+
+4. **GitHub Pro/Team Feature** (if available):
+   - Some GitHub plans support private workflows
+   - Check your plan's features
+
+**API Keys are Safe**: Secrets stored in GitHub Secrets are masked in logs and never exposed, even in public repos.
+
+📖 **See `.github/PRIVACY.md` for detailed privacy guidance and solutions.**
+
 ## License
 
 MIT
