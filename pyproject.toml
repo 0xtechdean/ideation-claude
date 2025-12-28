@@ -5,7 +5,7 @@ description = "Multi-agent startup validator using Claude CLI"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "claude-code-sdk>=0.1.0",
+    "claude-code-sdk>=0.0.20",
     "click>=8.1.0",
     "pydantic>=2.0.0",
     "mem0ai>=0.1.0",
