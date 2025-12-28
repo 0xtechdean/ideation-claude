@@ -180,9 +180,18 @@ Begin the evaluation now."""
         """Extract the total score from output."""
         import re
         patterns = [
-            r"Total[:\s]*(\d+\.?\d*)/10",
+            # Markdown table: | **TOTAL** | **6.25/10** |
+            r"\*\*TOTAL\*\*\s*\|\s*\*\*(\d+\.?\d*)/10\*\*",
+            # Bold total: **TOTAL**: **6.5/10**
+            r"\*\*TOTAL\*\*[:\s]*\*\*(\d+\.?\d*)/10\*\*",
+            # Plain: TOTAL: 6.5/10 or Total: 6.5/10
             r"TOTAL[:\s]*(\d+\.?\d*)/10",
+            r"Total[:\s]*(\d+\.?\d*)/10",
+            # Average: 6.5/10
             r"Average[:\s]*(\d+\.?\d*)/10",
+            # Score header: **Score**: 6.25/10
+            r"\*\*Score\*\*[:\s]*(\d+\.?\d*)/10",
+            # Generic: Score: 6.5/10
             r"Score[:\s]*(\d+\.?\d*)/10",
         ]
         for pattern in patterns:

@@ -109,11 +109,19 @@ class IdeationOrchestrator:
 
     def _extract_score(self, scoring_text: str) -> float:
         """Extract the total score from scoring output."""
-        # Look for patterns like "TOTAL: 6.5/10" or "Total Score: 6.5"
+        # Look for various patterns the agents might use
         patterns = [
+            # Markdown table: | **TOTAL** | **6.25/10** |
+            r"\*\*TOTAL\*\*\s*\|\s*\*\*(\d+\.?\d*)/10\*\*",
+            # Bold total: **TOTAL**: **6.5/10**
             r"\*\*TOTAL\*\*[:\s]*\*\*(\d+\.?\d*)/10\*\*",
+            # Plain: TOTAL: 6.5/10
             r"TOTAL[:\s]*(\d+\.?\d*)/10",
+            # Score header: **Score**: 6.25/10
+            r"\*\*Score\*\*[:\s]*(\d+\.?\d*)/10",
+            # Total Score: 6.5
             r"Total Score[:\s]*(\d+\.?\d*)",
+            # Generic: Score: 6.5/10
             r"Score[:\s]*(\d+\.?\d*)/10",
         ]
 
