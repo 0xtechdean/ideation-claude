@@ -142,7 +142,12 @@ Customer Discovery: {customer_discovery[:500] if customer_discovery else 'N/A'}
                 "timestamp": datetime.now().isoformat(),
             }
         )
-        return result.get("id", "unknown")
+        # Mem0 cloud returns queued result: {'results': [{'event_id': '...', 'status': 'PENDING'}]}
+        if isinstance(result, dict) and "results" in result and len(result["results"]) > 0:
+            event_id = result["results"][0].get("event_id", "unknown")
+            return event_id
+        # Fallback for local mode or different response format
+        return result.get("id", "unknown") if isinstance(result, dict) else "unknown"
 
     def save_eliminated_idea(
         self,
@@ -187,7 +192,14 @@ Customer Discovery: {customer_discovery[:500] if customer_discovery else 'N/A'}
         Returns:
             List of eliminated idea memories
         """
-        memories = self.memory.get_all(user_id=self.user_id)
+        # Mem0 cloud requires filters
+        if self._is_cloud:
+            memories = self.memory.get_all(
+                user_id=self.user_id,
+                filters={"metadata": {"type": "evaluated_idea", "eliminated": True}}
+            )
+        else:
+            memories = self.memory.get_all(user_id=self.user_id)
         return [m for m in memories.get("results", [])[:limit]]
 
     def search_similar_ideas(self, query: str, limit: int = 5) -> list[dict]:
@@ -200,7 +212,20 @@ Customer Discovery: {customer_discovery[:500] if customer_discovery else 'N/A'}
         Returns:
             List of similar eliminated ideas
         """
-        results = self.memory.search(query, user_id=self.user_id, limit=limit)
+        # Mem0 cloud search may require filters
+        try:
+            if self._is_cloud:
+                results = self.memory.search(
+                    query,
+                    user_id=self.user_id,
+                    limit=limit,
+                    filters={"metadata": {"type": "evaluated_idea"}}
+                )
+            else:
+                results = self.memory.search(query, user_id=self.user_id, limit=limit)
+        except Exception:
+            # Fallback if filters not supported in search
+            results = self.memory.search(query, user_id=self.user_id, limit=limit)
         return results.get("results", [])
 
     def save_phase_output(
@@ -255,13 +280,29 @@ Output:
         Returns:
             List of relevant market insights
         """
-        results = self.memory.search(query, user_id=self.user_id, limit=limit)
+        try:
+            if self._is_cloud:
+                # Search with filter for phase outputs and evaluated ideas
+                results = self.memory.search(
+                    query,
+                    user_id=self.user_id,
+                    limit=limit * 2,  # Get more to filter
+                    filters={"metadata": {"type": {"$in": ["phase_output", "evaluated_idea"]}}}
+                )
+            else:
+                results = self.memory.search(query, user_id=self.user_id, limit=limit * 2)
+        except Exception:
+            # Fallback if filters not supported
+            results = self.memory.search(query, user_id=self.user_id, limit=limit * 2)
+        
         # Filter for phase outputs and ideas
         insights = []
         for result in results.get("results", []):
             meta = result.get("metadata", {})
             if meta.get("type") in ["phase_output", "evaluated_idea"]:
                 insights.append(result)
+                if len(insights) >= limit:
+                    break
         return insights
 
     def get_similar_ideas_context(self, topic: str, limit: int = 3) -> str:
@@ -318,10 +359,26 @@ Output:
         Returns:
             List of idea memories
         """
-        memories = self.memory.get_all(user_id=self.user_id)
+        # Mem0 cloud requires filters
+        if self._is_cloud:
+            filters = {"metadata": {"type": "evaluated_idea"}}
+            if status:
+                filters["metadata"]["status"] = status.lower()
+            try:
+                memories = self.memory.get_all(user_id=self.user_id, filters=filters)
+            except Exception:
+                # Fallback: get all and filter client-side
+                memories = self.memory.get_all(
+                    user_id=self.user_id,
+                    filters={"metadata": {"type": "evaluated_idea"}}
+                )
+        else:
+            memories = self.memory.get_all(user_id=self.user_id)
+        
         ideas = [m for m in memories.get("results", [])]
         
-        if status:
+        # Additional client-side filtering if needed
+        if status and not self._is_cloud:
             ideas = [
                 m for m in ideas
                 if m.get("metadata", {}).get("status") == status.lower()
