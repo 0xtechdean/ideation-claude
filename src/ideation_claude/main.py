@@ -61,25 +61,23 @@ from .orchestrator_subagent import evaluate_with_subagents
 )
 @click.pass_context
 def cli(ctx, threshold, output, interactive, quiet, subagent, metrics, problem_only):
-    """Ideation-Claude: Multi-agent startup idea validator.
+    """Ideation-Claude: Multi-agent problem validator and solution finder.
 
-    Evaluate startup ideas using Claude CLI agents that perform:
-    - Market research and trend analysis
-    - Competitive landscape analysis
-    - TAM/SAM/SOM market sizing
-    - Technical feasibility assessment
-    - Lean Startup hypothesis extraction
-    - Mom Test customer discovery planning
-    - 8-criteria scoring
-    - Pivot suggestions for eliminated ideas
+    Validate problems and find solutions using Claude CLI agents that perform:
+    - Problem validation (market research, pain points, market sizing)
+    - Customer discovery planning (Mom Test)
+    - Solution validation (competitive analysis, technical feasibility)
+    - Lean Startup hypothesis extraction and MVP definition
+    - 16-criteria scoring (8 problem-focused + 8 solution-focused)
+    - Alternative approaches for eliminated problems
 
     Examples:
 
-        # Evaluate a single idea
-        ideation-claude "AI-powered legal research assistant"
+        # Evaluate a single problem
+        ideation-claude "Legal research is too time-consuming and expensive"
 
-        # Evaluate multiple ideas
-        ideation-claude "Legal AI" "Sustainable packaging"
+        # Evaluate multiple problems
+        ideation-claude "Finding sustainable packaging is difficult" "Personal finance management is confusing"
 
         # With custom threshold
         ideation-claude --threshold 6.0 "Your idea"
@@ -124,7 +122,7 @@ def cli(ctx, threshold, output, interactive, quiet, subagent, metrics, problem_o
 
 
 async def run_evaluation(
-    topics: list[str],
+    problems: list[str],
     threshold: float,
     output: str | None,
     verbose: bool,
@@ -140,24 +138,24 @@ async def run_evaluation(
         if verbose:
             click.echo("Using sub-agent orchestrator mode...")
         results = []
-        for topic in topics:
+        for problem in problems:
             if metrics:
-                with PipelineMonitor(topic, threshold, verbose, "subagent") as monitor:
-                    result = await evaluate_with_subagents(topic, threshold, verbose)
+                with PipelineMonitor(problem, threshold, verbose, "subagent") as monitor:
+                    result = await evaluate_with_subagents(problem, threshold, verbose)
                     monitor.complete_evaluation(result.total_score, result.eliminated)
             else:
-                result = await evaluate_with_subagents(topic, threshold, verbose)
+                result = await evaluate_with_subagents(problem, threshold, verbose)
             results.append(result)
-    elif len(topics) == 1:
+    elif len(problems) == 1:
         if metrics:
-            with PipelineMonitor(topics[0], threshold, verbose, "direct") as monitor:
-                result = await evaluate_idea(topics[0], threshold, verbose, monitor=monitor, problem_only=problem_only)
+            with PipelineMonitor(problems[0], threshold, verbose, "direct") as monitor:
+                result = await evaluate_idea(problems[0], threshold, verbose, monitor=monitor, problem_only=problem_only)
                 monitor.complete_evaluation(result.total_score, result.eliminated)
         else:
-            result = await evaluate_idea(topics[0], threshold, verbose, problem_only=problem_only)
+            result = await evaluate_idea(problems[0], threshold, verbose, problem_only=problem_only)
         results = [result]
     else:
-        results = await evaluate_ideas(topics, threshold, verbose)
+        results = await evaluate_ideas(problems, threshold, verbose)
 
     # Print summary
     click.echo("\n" + "=" * 60)
@@ -167,18 +165,18 @@ async def run_evaluation(
     passed = [r for r in results if not r.eliminated]
     eliminated = [r for r in results if r.eliminated]
 
-    click.echo(f"\nTotal ideas evaluated: {len(results)}")
+    click.echo(f"\nTotal problems evaluated: {len(results)}")
     click.echo(f"Passed: {len(passed)}")
     click.echo(f"Eliminated: {len(eliminated)}")
     click.echo(f"Threshold: {threshold}")
 
     if passed:
-        click.echo("\nPASSED IDEAS:")
+        click.echo("\nPASSED PROBLEMS:")
         for r in sorted(passed, key=lambda x: x.total_score, reverse=True):
             click.echo(f"  - {r.topic}: {r.total_score}/10")
 
     if eliminated:
-        click.echo("\nELIMINATED IDEAS:")
+        click.echo("\nELIMINATED PROBLEMS:")
         for r in sorted(eliminated, key=lambda x: x.total_score, reverse=True):
             click.echo(f"  - {r.topic}: {r.total_score}/10")
 
@@ -230,19 +228,19 @@ async def interactive_mode(threshold: float, quiet: bool, subagent: bool = False
 
         elif cmd == "add" or cmd == "a":
             if len(parts) > 1:
-                topic = parts[1]
-                topics.append(topic)
-                click.echo(f"Added: {topic}")
+                problem = " ".join(parts[1:])
+                topics.append(problem)
+                click.echo(f"Added: {problem}")
             else:
-                click.echo("Usage: add <idea>")
+                click.echo("Usage: add <problem>")
 
         elif cmd == "list" or cmd == "l":
             if topics:
-                click.echo("Current ideas:")
-                for i, topic in enumerate(topics, 1):
-                    click.echo(f"  {i}. {topic}")
+                click.echo("Current problems:")
+                for i, problem in enumerate(topics, 1):
+                    click.echo(f"  {i}. {problem}")
             else:
-                click.echo("No ideas added yet. Use 'add <idea>' to add one.")
+                click.echo("No problems added yet. Use 'add <problem>' to add one.")
 
         elif cmd == "clear" or cmd == "c":
             topics.clear()
@@ -250,7 +248,7 @@ async def interactive_mode(threshold: float, quiet: bool, subagent: bool = False
 
         elif cmd == "run" or cmd == "r":
             if not topics:
-                click.echo("No ideas to evaluate. Use 'add <idea>' first.")
+                click.echo("No problems to evaluate. Use 'add <problem>' first.")
             else:
                 await run_evaluation(topics, threshold, None, not quiet, subagent, False, False)
                 topics.clear()
@@ -271,15 +269,15 @@ async def interactive_mode(threshold: float, quiet: bool, subagent: bool = False
                 click.echo(f"Current threshold: {threshold}")
 
         else:
-            # Treat as an idea to add
+            # Treat as a problem to add
             topics.append(command)
             click.echo(f"Added: {command}")
 
 
 @cli.command()
-@click.argument("topic")
-def add(topic):
-    """Add a pending idea to Mem0 for later evaluation."""
+@click.argument("problem")
+def add(problem):
+    """Add a pending problem to Mem0 for later evaluation."""
     memory = get_memory()
     memory_id = memory.save_pending_idea(topic)
     if memory_id != "unknown":

@@ -66,13 +66,13 @@ class IdeaResult:
 class PipelineState:
     """State maintained across the pipeline."""
 
-    topic: str
+    problem: str
     threshold: float = 5.0
     session_id: Optional[str] = None
     results: IdeaResult = field(default_factory=lambda: IdeaResult(topic=""))
 
     def __post_init__(self):
-        self.results = IdeaResult(topic=self.topic)
+        self.results = IdeaResult(topic=self.problem)
 
 
 class IdeationOrchestrator:
@@ -82,15 +82,15 @@ class IdeationOrchestrator:
     passed between phases for continuity.
     """
 
-    def __init__(self, topic: str, threshold: float = 5.0, use_memory: bool = True):
+    def __init__(self, problem: str, threshold: float = 5.0, use_memory: bool = True):
         """Initialize the orchestrator.
 
         Args:
-            topic: The startup idea/topic to evaluate
+            problem: The problem statement to validate and find solutions for
             threshold: Elimination threshold (default 5.0)
             use_memory: Whether to use Mem0 for storing and retrieving context
         """
-        self.state = PipelineState(topic=topic, threshold=threshold)
+        self.state = PipelineState(problem=problem, threshold=threshold)
         self.agents_dir = Path(__file__).parent / "agents"
         self.memory = get_memory() if use_memory else None
 
@@ -191,20 +191,20 @@ class IdeationOrchestrator:
         """
         from .monitoring import Phase
 
-        topic = self.state.topic
+        problem = self.state.problem
         result = ProblemValidationResult()
 
         def log(msg: str):
             if verbose and not monitor:
                 print(f"  {msg}")
 
-        # Check for similar ideas before starting
+        # Check for similar problems before starting
         similar_context = ""
         if self.memory:
-            similar = self.memory.check_if_similar_eliminated(topic)
+            similar = self.memory.check_if_similar_eliminated(problem)
             if similar:
-                log(f"⚠ Found similar eliminated idea: {similar.get('metadata', {}).get('topic', 'Unknown')}")
-            similar_context = self.memory.get_similar_ideas_context(topic)
+                log(f"⚠ Found similar eliminated problem: {similar.get('metadata', {}).get('topic', 'Unknown')}")
+            similar_context = self.memory.get_similar_ideas_context(problem)
             if similar_context:
                 log("📚 Using context from similar past evaluations")
 
@@ -214,7 +214,7 @@ class IdeationOrchestrator:
         else:
             log("[1/3] Researching market trends and customer pain points...")
         
-        research_prompt = f"Research market trends and customer pain points for: {topic}"
+        research_prompt = f"Research market trends and customer pain points for this problem: {problem}"
         if similar_context:
             research_prompt += f"\n\n{similar_context}"
         
@@ -226,7 +226,7 @@ class IdeationOrchestrator:
         
         # Store research insights in memory
         if self.memory:
-            self.memory.save_phase_output(topic, "research", result.research_insights)
+            self.memory.save_phase_output(problem, "research", result.research_insights)
         
         if monitor:
             monitor.complete_phase(Phase.RESEARCH, api_calls=1)
@@ -239,12 +239,12 @@ class IdeationOrchestrator:
         
         result.market_sizing = await self._run_agent(
             "market_analyst",
-            f"Analyze market size for: {topic}\n\nResearch context:\n{result.research_insights[:2000]}",
+            f"Analyze market size for this problem: {problem}\n\nResearch context:\n{result.research_insights[:2000]}",
             allowed_tools=["WebSearch"],
         )
         
         if self.memory:
-            self.memory.save_phase_output(topic, "market_sizing", result.market_sizing)
+            self.memory.save_phase_output(problem, "market_sizing", result.market_sizing)
         
         if monitor:
             monitor.complete_phase(Phase.MARKET_SIZING, api_calls=1)
@@ -255,7 +255,7 @@ class IdeationOrchestrator:
         else:
             log("[3/3] Planning customer discovery interviews (Mom Test)...")
         
-        customer_prompt = f"Plan customer discovery interviews for: {topic}\n\n"
+        customer_prompt = f"Plan customer discovery interviews for this problem: {problem}\n\n"
         customer_prompt += f"Research Insights:\n{result.research_insights[:1500]}\n\n"
         customer_prompt += f"Market Sizing:\n{result.market_sizing[:1500]}"
         
@@ -266,7 +266,7 @@ class IdeationOrchestrator:
         )
         
         if self.memory:
-            self.memory.save_phase_output(topic, "customer_discovery", result.customer_discovery)
+            self.memory.save_phase_output(problem, "customer_discovery", result.customer_discovery)
         
         if monitor:
             monitor.complete_phase(Phase.CUSTOMER_DISCOVERY, api_calls=1)
@@ -278,6 +278,8 @@ class IdeationOrchestrator:
             log("[4/4] Scoring problem validation...")
         
         problem_context = f"""
+Problem Statement: {problem}
+
 Research Insights (Market Trends & Pain Points):
 {result.research_insights[:2000]}
 
@@ -288,7 +290,7 @@ Customer Discovery Plan:
 {result.customer_discovery[:1500]}
 """
         
-        problem_scoring_prompt = f"""Score the PROBLEM VALIDATION for: {topic}
+        problem_scoring_prompt = f"""Score the PROBLEM VALIDATION for this problem: {problem}
 
 Focus on validating the PROBLEM, not the solution. Evaluate:
 1. **Problem Clarity** (1-10): How clearly defined is the problem? Is it a real pain point?
@@ -390,7 +392,7 @@ If the average score < {self.state.threshold}, mark as ELIMINATED.
             # Save to memory
             if self.memory:
                 self.memory.save_idea(
-                    topic=topic,
+                    topic=problem,
                     eliminated=True,
                     score=problem_result.problem_score,
                     threshold=self.state.threshold,
@@ -426,12 +428,12 @@ If the average score < {self.state.threshold}, mark as ELIMINATED.
         
         solution_result.competitor_analysis = await self._run_agent(
             "competitor_analyst",
-            f"Analyze competitors for: {topic}\n\nProblem Context:\n{problem_result.research_insights[:2000]}",
+            f"Analyze existing solutions and competitors for this problem: {problem}\n\nProblem Context:\n{problem_result.research_insights[:2000]}",
             allowed_tools=["WebSearch"],
         )
         
         if self.memory:
-            self.memory.save_phase_output(topic, "competitor_analysis", solution_result.competitor_analysis)
+            self.memory.save_phase_output(problem, "competitor_analysis", solution_result.competitor_analysis)
         
         if monitor:
             monitor.complete_phase(Phase.COMPETITOR_ANALYSIS, api_calls=1)
@@ -444,14 +446,14 @@ If the average score < {self.state.threshold}, mark as ELIMINATED.
         
         solution_result.resource_findings = await self._run_agent(
             "resource_scout",
-            f"Find resources and assess technical feasibility for: {topic}\n\n"
+            f"Find resources and assess technical feasibility for solving this problem: {problem}\n\n"
             f"Problem Context:\n{problem_result.research_insights[:2000]}\n\n"
             f"Competitor Analysis:\n{solution_result.competitor_analysis[:1500]}",
             allowed_tools=["WebSearch"],
         )
         
         if self.memory:
-            self.memory.save_phase_output(topic, "resource_findings", solution_result.resource_findings)
+            self.memory.save_phase_output(problem, "resource_findings", solution_result.resource_findings)
         
         if monitor:
             monitor.complete_phase(Phase.RESOURCE_SCOUT, api_calls=1)
@@ -475,12 +477,12 @@ Solution Context:
         
         solution_result.hypothesis = await self._run_agent(
             "hypothesis_architect",
-            f"Extract riskiest assumptions and define MVP for: {topic}\n\n{solution_context}",
+            f"Extract riskiest assumptions and define MVP for solving this problem: {problem}\n\n{solution_context}",
             allowed_tools=[],
         )
         
         if self.memory:
-            self.memory.save_phase_output(topic, "hypothesis", solution_result.hypothesis)
+            self.memory.save_phase_output(problem, "hypothesis", solution_result.hypothesis)
         
         if monitor:
             monitor.complete_phase(Phase.HYPOTHESIS, api_calls=1)
@@ -503,7 +505,7 @@ Solution Validation:
 - Hypothesis & MVP: {solution_result.hypothesis[:1500]}
 """
         
-        solution_scoring_prompt = f"""Score the SOLUTION VALIDATION for: {topic}
+        solution_scoring_prompt = f"""Score the SOLUTION VALIDATION for solving this problem: {problem}
 
 Focus on validating the SOLUTION, not just the problem. Evaluate:
 1. **Solution Fit** (1-10): How well does the solution address the validated problem?
@@ -557,14 +559,14 @@ If the average score < {self.state.threshold}, mark as ELIMINATED.
             if parallel:
                 pivot_task = self._run_agent(
                     "pivot_advisor",
-                    f"Suggest pivots for the eliminated idea: {topic}\n\n"
+                    f"Suggest alternative approaches for solving this problem: {problem}\n\n"
                     f"Score: {results.total_score}/10\n"
                     f"Scoring details:\n{results.scores[:1500]}",
                     allowed_tools=[],
                 )
                 report_task = self._run_agent(
                     "report_generator",
-                    f"Generate the final evaluation report for: {topic}\n\n"
+                    f"Generate the final evaluation report for this problem: {problem}\n\n"
                     f"Decision: ELIMINATED\n"
                     f"Problem Score: {problem_result.problem_score}/10\n"
                     f"Solution Score: {solution_result.solution_score}/10\n"
@@ -578,14 +580,14 @@ If the average score < {self.state.threshold}, mark as ELIMINATED.
             else:
                 results.pivot_suggestions = await self._run_agent(
                     "pivot_advisor",
-                    f"Suggest pivots for the eliminated idea: {topic}\n\n"
+                    f"Suggest alternative approaches for solving this problem: {problem}\n\n"
                     f"Score: {results.total_score}/10\n"
                     f"Scoring details:\n{results.scores[:1500]}",
                     allowed_tools=[],
                 )
                 results.report = await self._run_agent(
                     "report_generator",
-                    f"Generate the final evaluation report for: {topic}\n\n"
+                    f"Generate the final evaluation report for this problem: {problem}\n\n"
                     f"Decision: ELIMINATED\n"
                     f"Problem Score: {problem_result.problem_score}/10\n"
                     f"Solution Score: {solution_result.solution_score}/10\n"
@@ -598,7 +600,7 @@ If the average score < {self.state.threshold}, mark as ELIMINATED.
             results.pivot_suggestions = "N/A - Idea passed evaluation"
             results.report = await self._run_agent(
                 "report_generator",
-                f"Generate the final evaluation report for: {topic}\n\n"
+                f"Generate the final evaluation report for this problem: {problem}\n\n"
                 f"Decision: PASSED\n"
                 f"Problem Score: {problem_result.problem_score}/10\n"
                 f"Solution Score: {solution_result.solution_score}/10\n"
@@ -609,10 +611,10 @@ If the average score < {self.state.threshold}, mark as ELIMINATED.
 
         results.decision = "ELIMINATED" if results.eliminated else "PASSED"
 
-        # Save complete idea evaluation to memory
+        # Save complete problem evaluation to memory
         if self.memory:
             self.memory.save_idea(
-                topic=topic,
+                topic=problem,
                 eliminated=results.eliminated,
                 score=results.total_score,
                 threshold=self.state.threshold,
@@ -631,17 +633,17 @@ If the average score < {self.state.threshold}, mark as ELIMINATED.
 
 
 async def evaluate_idea(
-    topic: str,
+    problem: str,
     threshold: float = 5.0,
     verbose: bool = True,
     monitor=None,
     use_memory: bool = True,
     problem_only: bool = False,
 ) -> IdeaResult:
-    """Convenience function to evaluate a single idea.
+    """Convenience function to evaluate a problem and find solutions.
 
     Args:
-        topic: The startup idea to evaluate
+        problem: The problem statement to validate and find solutions for
         threshold: Elimination threshold (default 5.0)
         verbose: Whether to print progress
         monitor: Optional PipelineMonitor instance
@@ -651,33 +653,33 @@ async def evaluate_idea(
     Returns:
         IdeaResult with complete evaluation
     """
-    orchestrator = IdeationOrchestrator(topic=topic, threshold=threshold, use_memory=use_memory)
+    orchestrator = IdeationOrchestrator(problem=problem, threshold=threshold, use_memory=use_memory)
     return await orchestrator.run_pipeline(verbose=verbose, monitor=monitor, problem_only=problem_only)
 
 
 async def evaluate_ideas(
-    topics: list[str],
+    problems: list[str],
     threshold: float = 5.0,
     verbose: bool = True,
 ) -> list[IdeaResult]:
-    """Evaluate multiple ideas sequentially.
+    """Evaluate multiple problems sequentially.
 
     Args:
-        topics: List of startup ideas to evaluate
+        problems: List of problem statements to evaluate
         threshold: Elimination threshold
         verbose: Whether to print progress
 
     Returns:
-        List of IdeaResult for each topic
+        List of IdeaResult for each problem
     """
     results = []
-    for i, topic in enumerate(topics, 1):
+    for i, problem in enumerate(problems, 1):
         if verbose:
             print(f"\n{'='*60}")
-            print(f"Evaluating idea {i}/{len(topics)}: {topic}")
+            print(f"Evaluating problem {i}/{len(problems)}: {problem}")
             print("=" * 60)
 
-        result = await evaluate_idea(topic, threshold, verbose)
+        result = await evaluate_idea(problem, threshold, verbose)
         results.append(result)
 
         if verbose:
