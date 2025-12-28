@@ -166,11 +166,7 @@ jobs:
                   IDEA_NUM=$((IDEA_NUM + 1))
                   echo "::group::💡 Evaluating Idea $IDEA_NUM/$IDEA_COUNT: $idea"
                   OUTPUT_FILE="reports/$(echo "$idea" | tr ' ' '_' | tr -cd '[:alnum:]_').md"
-                  if [ "${{ github.event.inputs.subagent }}" = "true" ]; then
-                    ideation-claude $QUIET_FLAG $METRICS_FLAG --subagent --threshold ${{ github.event.inputs.threshold }} "$idea" -o "$OUTPUT_FILE"
-                  else
-                    ideation-claude $QUIET_FLAG $METRICS_FLAG --threshold ${{ github.event.inputs.threshold }} "$idea" -o "$OUTPUT_FILE"
-                  fi
+                  ideation-claude $QUIET_FLAG $METRICS_FLAG --threshold ${{ github.event.inputs.threshold }} "$idea" -o "$OUTPUT_FILE"
                   echo "✓ Report saved: $OUTPUT_FILE"
                   echo "::endgroup::"
                 done
