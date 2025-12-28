@@ -532,8 +532,7 @@ A single Claude coordinator instance uses the Task tool to spawn specialized sub
 ideation-claude/
 ├── src/ideation_claude/
 │   ├── main.py                  # CLI interface
-│   ├── orchestrator.py          # Direct SDK pipeline with parallel execution
-│   ├── orchestrator_subagent.py # Sub-agent orchestrator using Task tool
+│   ├── orchestrator.py          # Legacy direct SDK pipeline (not used)
 │   ├── memory.py                # Mem0 integration
 │   └── agents/                  # System prompts
 │       ├── researcher.md
@@ -587,7 +586,6 @@ This project includes GitHub Actions workflows that allow you to run evaluations
    | `idea` | Startup idea(s) to evaluate. Can be a single idea or comma-separated list | Yes | - |
    | `ideas_file` | Path to ideas file (e.g., `.github/ideas.txt`). Overrides `idea` if provided | No | - |
    | `threshold` | Elimination threshold (1-10) | No | `5.0` |
-   | `subagent` | Use sub-agent orchestrator mode | No | `false` |
    | `problem_only` | Only run problem validation phase | No | `false` |
    | `quiet` | Suppress progress output | No | `false` |
    | `python_version` | Python version to use | No | `3.10` |
@@ -612,7 +610,6 @@ gh workflow run ideation.yml -f idea="AI-powered legal research assistant" -f th
 gh workflow run ideation.yml \
   -f idea="AI legal assistant,Sustainable packaging,Personal finance AI" \
   -f threshold=5.5 \
-  -f subagent=true
 ```
 
 **Using ideas file:**
@@ -644,7 +641,6 @@ gh workflow run ideation.yml \
 gh workflow run ideation-docker.yml \
   -f idea="Your idea" \
   -f threshold=6.0 \
-  -f subagent=true
 ```
 
 ### Workflow Features
