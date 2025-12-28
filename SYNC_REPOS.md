@@ -7,7 +7,7 @@ This project maintains two repositories:
    - Code sharing and collaboration
    - GitHub Actions workflows
 
-2. **Private Repository**: https://github.com/Othentic-Ai/ideation-claude
+2. **Private Repository**: https://github.com/Othentic-Ai/ideation-claude-private
    - Private visibility
    - Contains secrets and sensitive evaluations
    - Forked from public repo
@@ -17,7 +17,7 @@ This project maintains two repositories:
 The repository is configured with the following remotes:
 
 - **`origin`**: Public repository (0xtechdean/ideation-claude)
-- **`private`**: Private repository (Othentic-Ai/ideation-claude)
+- **`private`**: Private repository (Othentic-Ai/ideation-claude-private)
 - **`upstream`**: Public repository (same as origin, for consistency)
 
 ## Syncing Workflows
