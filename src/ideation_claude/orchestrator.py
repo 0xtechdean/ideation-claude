@@ -128,11 +128,12 @@ class IdeationOrchestrator:
         """Check if the idea was eliminated based on scoring output."""
         return "ELIMINATE" in scoring_text.upper()
 
-    async def run_pipeline(self, verbose: bool = True) -> IdeaResult:
+    async def run_pipeline(self, verbose: bool = True, parallel: bool = True) -> IdeaResult:
         """Run the full 9-phase evaluation pipeline.
 
         Args:
             verbose: Whether to print progress messages
+            parallel: Whether to run independent agents in parallel (default: True)
 
         Returns:
             IdeaResult with all findings
@@ -144,61 +145,110 @@ class IdeationOrchestrator:
             if verbose:
                 print(f"  {msg}")
 
-        # Phase 1: Research
-        log("[1/9] Researching market trends and pain points...")
+        # Phase 1: Research (must run first - baseline for all others)
+        log("[1/6] Researching market trends and pain points...")
         results.research_insights = await self._run_agent(
             "researcher",
             f"Research market trends and customer pain points for: {topic}",
             allowed_tools=["WebSearch"],
         )
 
-        # Phase 2: Competitor Analysis
-        log("[2/9] Analyzing competitive landscape...")
-        results.competitor_analysis = await self._run_agent(
-            "competitor_analyst",
-            f"Analyze competitors for: {topic}\n\nUse the research context from the previous phase.",
-            allowed_tools=["WebSearch"],
-        )
+        # Phase 2: Parallel analysis (Competitor + Market + Resource)
+        # All three only need research context, so they can run simultaneously
+        if parallel:
+            log("[2/6] Running parallel analysis (competitor, market, resources)...")
+            competitor_task = self._run_agent(
+                "competitor_analyst",
+                f"Analyze competitors for: {topic}\n\nResearch context:\n{results.research_insights[:2000]}",
+                allowed_tools=["WebSearch"],
+            )
+            market_task = self._run_agent(
+                "market_analyst",
+                f"Analyze market size for: {topic}\n\nResearch context:\n{results.research_insights[:2000]}",
+                allowed_tools=["WebSearch"],
+            )
+            resource_task = self._run_agent(
+                "resource_scout",
+                f"Find resources and assess technical feasibility for: {topic}\n\nResearch context:\n{results.research_insights[:2000]}",
+                allowed_tools=["WebSearch"],
+            )
 
-        # Phase 3: Market Sizing
-        log("[3/9] Estimating market size (TAM/SAM/SOM)...")
-        results.market_sizing = await self._run_agent(
-            "market_analyst",
-            f"Analyze market size for: {topic}\n\nUse context from research and competitor analysis.",
-            allowed_tools=["WebSearch"],
-        )
+            # Run all three in parallel
+            competitor_result, market_result, resource_result = await asyncio.gather(
+                competitor_task, market_task, resource_task
+            )
+            results.competitor_analysis = competitor_result
+            results.market_sizing = market_result
+            results.resource_findings = resource_result
+        else:
+            # Sequential fallback
+            log("[2/6] Analyzing competitive landscape...")
+            results.competitor_analysis = await self._run_agent(
+                "competitor_analyst",
+                f"Analyze competitors for: {topic}\n\nResearch context:\n{results.research_insights[:2000]}",
+                allowed_tools=["WebSearch"],
+            )
 
-        # Phase 4: Resource Discovery
-        log("[4/9] Discovering resources and assessing feasibility...")
-        results.resource_findings = await self._run_agent(
-            "resource_scout",
-            f"Find resources and assess technical feasibility for: {topic}",
-            allowed_tools=["WebSearch"],
-        )
+            log("[3/6] Estimating market size (TAM/SAM/SOM)...")
+            results.market_sizing = await self._run_agent(
+                "market_analyst",
+                f"Analyze market size for: {topic}\n\nResearch context:\n{results.research_insights[:2000]}",
+                allowed_tools=["WebSearch"],
+            )
 
-        # Phase 5: Hypothesis & MVP (Lean Startup)
-        log("[5/9] Extracting assumptions and defining MVP...")
+            log("[4/6] Discovering resources and assessing feasibility...")
+            results.resource_findings = await self._run_agent(
+                "resource_scout",
+                f"Find resources and assess technical feasibility for: {topic}\n\nResearch context:\n{results.research_insights[:2000]}",
+                allowed_tools=["WebSearch"],
+            )
+
+        # Build context summary for subsequent phases
+        context_summary = f"""
+Research Insights:
+{results.research_insights[:1500]}
+
+Competitor Analysis:
+{results.competitor_analysis[:1500]}
+
+Market Sizing:
+{results.market_sizing[:1500]}
+
+Resources & Feasibility:
+{results.resource_findings[:1500]}
+"""
+
+        # Phase 3: Hypothesis & MVP (Lean Startup)
+        log("[3/6] Extracting assumptions and defining MVP...")
         results.hypothesis = await self._run_agent(
             "hypothesis_architect",
-            f"Extract riskiest assumptions and define MVP for: {topic}\n\nUse all prior analysis as context.",
+            f"Extract riskiest assumptions and define MVP for: {topic}\n\n{context_summary}",
             allowed_tools=[],
         )
 
-        # Phase 6: Customer Discovery (Mom Test)
-        log("[6/9] Planning customer discovery interviews...")
+        # Phase 4: Customer Discovery (Mom Test)
+        log("[4/6] Planning customer discovery interviews...")
         results.customer_discovery = await self._run_agent(
             "customer_discovery",
-            f"Plan customer discovery for: {topic}\n\nUse hypothesis and prior research as context.",
+            f"Plan customer discovery for: {topic}\n\nHypothesis:\n{results.hypothesis[:1500]}\n\n{context_summary}",
             allowed_tools=[],
         )
 
-        # Phase 7: Scoring
-        log("[7/9] Scoring opportunity across 8 criteria...")
+        # Phase 5: Scoring
+        log("[5/6] Scoring opportunity across 8 criteria...")
+        full_context = f"""
+{context_summary}
+
+Hypothesis & MVP:
+{results.hypothesis[:1000]}
+
+Customer Discovery Plan:
+{results.customer_discovery[:1000]}
+"""
         results.scores = await self._run_agent(
             "scoring_evaluator",
             f"Score the startup opportunity: {topic}\n\n"
-            f"Elimination threshold: {self.state.threshold}\n\n"
-            "Use all prior analysis to justify scores.",
+            f"Elimination threshold: {self.state.threshold}\n\n{full_context}",
             allowed_tools=[],
         )
 
@@ -208,7 +258,7 @@ class IdeationOrchestrator:
 
         # Self-evaluation loop for borderline scores (4.5-5.5)
         if 4.5 <= results.total_score <= 5.5 and results.scoring_iterations < 2:
-            log("[7b/9] Borderline score detected, re-evaluating...")
+            log("[5b/6] Borderline score detected, re-evaluating...")
             results.scores = await self._run_agent(
                 "scoring_evaluator",
                 f"Re-evaluate the scoring for: {topic}\n\n"
@@ -221,31 +271,56 @@ class IdeationOrchestrator:
             results.eliminated = self._is_eliminated(results.scores)
             results.scoring_iterations = 2
 
-        # Phase 8: Pivot Suggestions (only if eliminated)
+        # Phase 6: Pivot (if eliminated) + Report
         if results.eliminated:
-            log("[8/9] Generating pivot suggestions for eliminated idea...")
-            results.pivot_suggestions = await self._run_agent(
-                "pivot_advisor",
-                f"Suggest pivots for the eliminated idea: {topic}\n\n"
+            log("[6/6] Generating pivot suggestions and final report...")
+            # Run pivot and report in parallel since they're independent
+            if parallel:
+                pivot_task = self._run_agent(
+                    "pivot_advisor",
+                    f"Suggest pivots for the eliminated idea: {topic}\n\n"
+                    f"Score: {results.total_score}/10\n"
+                    f"Scoring details:\n{results.scores[:1500]}",
+                    allowed_tools=[],
+                )
+                report_task = self._run_agent(
+                    "report_generator",
+                    f"Generate the final evaluation report for: {topic}\n\n"
+                    f"Decision: ELIMINATED\n"
+                    f"Score: {results.total_score}/10\n"
+                    f"Threshold: {self.state.threshold}\n\n{full_context}",
+                    allowed_tools=[],
+                )
+                results.pivot_suggestions, results.report = await asyncio.gather(
+                    pivot_task, report_task
+                )
+            else:
+                results.pivot_suggestions = await self._run_agent(
+                    "pivot_advisor",
+                    f"Suggest pivots for the eliminated idea: {topic}\n\n"
+                    f"Score: {results.total_score}/10\n"
+                    f"Scoring details:\n{results.scores[:1500]}",
+                    allowed_tools=[],
+                )
+                results.report = await self._run_agent(
+                    "report_generator",
+                    f"Generate the final evaluation report for: {topic}\n\n"
+                    f"Decision: ELIMINATED\n"
+                    f"Score: {results.total_score}/10\n"
+                    f"Threshold: {self.state.threshold}\n\n{full_context}",
+                    allowed_tools=[],
+                )
+        else:
+            log("[6/6] Generating final report (passed evaluation)...")
+            results.pivot_suggestions = "N/A - Idea passed evaluation"
+            results.report = await self._run_agent(
+                "report_generator",
+                f"Generate the final evaluation report for: {topic}\n\n"
+                f"Decision: PASSED\n"
                 f"Score: {results.total_score}/10\n"
-                f"Use the scoring weaknesses to inform pivot suggestions.",
+                f"Threshold: {self.state.threshold}\n\n{full_context}",
                 allowed_tools=[],
             )
-        else:
-            log("[8/9] Skipping pivots (idea passed evaluation)")
-            results.pivot_suggestions = "N/A - Idea passed evaluation"
-
-        # Phase 9: Report Generation
-        log("[9/9] Generating final evaluation report...")
-        results.report = await self._run_agent(
-            "report_generator",
-            f"Generate the final evaluation report for: {topic}\n\n"
-            f"Decision: {'ELIMINATED' if results.eliminated else 'PASSED'}\n"
-            f"Score: {results.total_score}/10\n"
-            f"Threshold: {self.state.threshold}\n\n"
-            "Compile all analysis into a comprehensive report.",
-            allowed_tools=[],
-        )
 
         results.decision = "ELIMINATED" if results.eliminated else "PASSED"
 
