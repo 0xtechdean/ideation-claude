@@ -146,8 +146,12 @@ async def test_evaluate_ideas(mock_claude_query, mock_env_vars):
     """Test evaluate_ideas function."""
     with patch("ideation_claude.orchestrator.IdeationOrchestrator") as mock_orch:
         mock_instance = MagicMock()
-        mock_result = IdeaResult(topic="Test Idea", total_score=6.0)
-        mock_instance.run_pipeline = AsyncMock(return_value=mock_result)
+        # Return different results for each idea
+        mock_results = [
+            IdeaResult(topic="Idea 1", total_score=6.0),
+            IdeaResult(topic="Idea 2", total_score=7.0),
+        ]
+        mock_instance.run_pipeline = AsyncMock(side_effect=mock_results)
         mock_orch.return_value = mock_instance
         
         results = await evaluate_ideas(
@@ -158,5 +162,6 @@ async def test_evaluate_ideas(mock_claude_query, mock_env_vars):
         
         assert len(results) == 2
         topics = [r.topic for r in results]
-        assert "Idea 1" in topics or "Idea 2" in topics
+        assert "Idea 1" in topics
+        assert "Idea 2" in topics
 
