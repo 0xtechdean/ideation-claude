@@ -15,7 +15,7 @@ from .orchestrator import evaluate_idea, evaluate_ideas
 from .orchestrator_subagent import evaluate_with_subagents
 
 
-@click.group(invoke_without_command=True)
+@click.group(invoke_without_command=True, context_settings={'help_option_names': ['-h', '--help']})
 @click.option(
     "--threshold",
     "-t",
@@ -391,7 +391,10 @@ def insights(query, limit):
 def main():
     """Entry point for the CLI."""
     try:
-        cli()
+        cli(standalone_mode=False)
+    except click.ClickException as e:
+        # Click exception - try to re-parse as evaluation
+        _handle_as_evaluation()
     except SystemExit as e:
         # Click raises SystemExit(code=2) for command errors
         # If exit code is non-zero, try to re-parse as evaluation
@@ -447,6 +450,60 @@ def main():
                 return
         # Re-raise if we can't handle it
         raise
+    except Exception as e:
+        # Any other exception - try to handle as evaluation
+        _handle_as_evaluation()
+
+
+def _handle_as_evaluation():
+    """Handle command line arguments as evaluation when command matching fails."""
+    known_commands = {'add', 'pending', 'search', 'list', 'similar', 'insights'}
+    topics = []
+    skip_next = False
+    for arg in sys.argv[1:]:
+        if skip_next:
+            skip_next = False
+            continue
+        if arg.startswith('-'):
+            if arg in ['-t', '--threshold', '-o', '--output', '-l', '--limit']:
+                skip_next = True
+            continue
+        if arg in known_commands:
+            # It's actually a command, don't handle as evaluation
+            return
+        topics.append(arg)
+    
+    if topics:
+        # Treat as evaluation
+        threshold = 5.0
+        output = None
+        quiet = False
+        subagent = False
+        metrics = False
+        
+        # Parse options from sys.argv
+        i = 0
+        while i < len(sys.argv) - 1:
+            arg = sys.argv[i + 1]
+            if arg == '--threshold' or arg == '-t':
+                if i + 2 < len(sys.argv):
+                    threshold = float(sys.argv[i + 2])
+                    i += 2
+                    continue
+            elif arg == '--output' or arg == '-o':
+                if i + 2 < len(sys.argv):
+                    output = sys.argv[i + 2]
+                    i += 2
+                    continue
+            elif arg == '--quiet' or arg == '-q':
+                quiet = True
+            elif arg == '--subagent' or arg == '-s':
+                subagent = True
+            elif arg == '--metrics' or arg == '-m':
+                metrics = True
+            i += 1
+        
+        asyncio.run(run_evaluation(topics, threshold, output, not quiet, subagent, metrics))
 
 
 if __name__ == "__main__":
