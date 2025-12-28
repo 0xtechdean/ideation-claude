@@ -56,3 +56,7 @@ htmlcov/
 coverage.xml
 *.cover
 .hypothesis/
+
+# Metrics
+metrics/
+*.metrics.json

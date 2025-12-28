@@ -128,30 +128,42 @@ class IdeationOrchestrator:
         """Check if the idea was eliminated based on scoring output."""
         return "ELIMINATE" in scoring_text.upper()
 
-    async def run_pipeline(self, verbose: bool = True, parallel: bool = True) -> IdeaResult:
+    async def run_pipeline(
+        self, verbose: bool = True, parallel: bool = True, monitor=None
+    ) -> IdeaResult:
         """Run the full 9-phase evaluation pipeline.
 
         Args:
             verbose: Whether to print progress messages
             parallel: Whether to run independent agents in parallel (default: True)
+            monitor: Optional PipelineMonitor instance for tracking
 
         Returns:
             IdeaResult with all findings
         """
+        from .monitoring import Phase
+
         topic = self.state.topic
         results = self.state.results
 
         def log(msg: str):
-            if verbose:
+            if verbose and not monitor:
                 print(f"  {msg}")
 
         # Phase 1: Research (must run first - baseline for all others)
-        log("[1/6] Researching market trends and pain points...")
+        if monitor:
+            monitor.start_phase(Phase.RESEARCH, "Researching market trends and pain points")
+        else:
+            log("[1/6] Researching market trends and pain points...")
+        
         results.research_insights = await self._run_agent(
             "researcher",
             f"Research market trends and customer pain points for: {topic}",
             allowed_tools=["WebSearch"],
         )
+        
+        if monitor:
+            monitor.complete_phase(Phase.RESEARCH, api_calls=1)
 
         # Phase 2: Parallel analysis (Competitor + Market + Resource)
         # All three only need research context, so they can run simultaneously
@@ -331,6 +343,7 @@ async def evaluate_idea(
     topic: str,
     threshold: float = 5.0,
     verbose: bool = True,
+    monitor=None,
 ) -> IdeaResult:
     """Convenience function to evaluate a single idea.
 
@@ -343,7 +356,7 @@ async def evaluate_idea(
         IdeaResult with complete evaluation
     """
     orchestrator = IdeationOrchestrator(topic=topic, threshold=threshold)
-    return await orchestrator.run_pipeline(verbose=verbose)
+    return await orchestrator.run_pipeline(verbose=verbose, monitor=monitor)
 
 
 async def evaluate_ideas(

@@ -46,8 +46,14 @@ from .orchestrator_subagent import evaluate_with_subagents
     is_flag=True,
     help="Use sub-agent orchestrator (single coordinator spawns sub-agents)",
 )
+@click.option(
+    "--metrics",
+    "-m",
+    is_flag=True,
+    help="Save detailed metrics to JSON file",
+)
 @click.pass_context
-def cli(ctx, topics, threshold, output, interactive, quiet, subagent):
+def cli(ctx, topics, threshold, output, interactive, quiet, subagent, metrics):
     """Ideation-Claude: Multi-agent startup idea validator.
 
     Evaluate startup ideas using Claude CLI agents that perform:
@@ -77,7 +83,7 @@ def cli(ctx, topics, threshold, output, interactive, quiet, subagent):
     if interactive:
         asyncio.run(interactive_mode(threshold, quiet, subagent))
     elif topics:
-        asyncio.run(run_evaluation(list(topics), threshold, output, not quiet, subagent))
+        asyncio.run(run_evaluation(list(topics), threshold, output, not quiet, subagent, metrics))
     elif ctx.invoked_subcommand is None:
         click.echo(ctx.get_help())
 
@@ -88,18 +94,31 @@ async def run_evaluation(
     output: str | None,
     verbose: bool,
     subagent: bool = False,
+    metrics: bool = False,
 ):
     """Run the evaluation pipeline."""
+    from .monitoring import PipelineMonitor
+    
     if subagent:
         # Use sub-agent orchestrator (single coordinator spawns sub-agents)
         if verbose:
             click.echo("Using sub-agent orchestrator mode...")
         results = []
         for topic in topics:
-            result = await evaluate_with_subagents(topic, threshold, verbose)
+            if metrics:
+                with PipelineMonitor(topic, threshold, verbose, "subagent") as monitor:
+                    result = await evaluate_with_subagents(topic, threshold, verbose)
+                    monitor.complete_evaluation(result.total_score, result.eliminated)
+            else:
+                result = await evaluate_with_subagents(topic, threshold, verbose)
             results.append(result)
     elif len(topics) == 1:
-        result = await evaluate_idea(topics[0], threshold, verbose)
+        if metrics:
+            with PipelineMonitor(topics[0], threshold, verbose, "direct") as monitor:
+                result = await evaluate_idea(topics[0], threshold, verbose, monitor=monitor)
+                monitor.complete_evaluation(result.total_score, result.eliminated)
+        else:
+            result = await evaluate_idea(topics[0], threshold, verbose)
         results = [result]
     else:
         results = await evaluate_ideas(topics, threshold, verbose)

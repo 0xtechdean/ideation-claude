@@ -96,6 +96,9 @@ ideation-claude --output report.md "Your idea"
 
 # Use sub-agent orchestrator mode
 ideation-claude --subagent "Your idea"
+
+# With metrics and monitoring
+ideation-claude --metrics "Your idea"
 ```
 
 ### Docker Usage
@@ -475,6 +478,29 @@ Tests run automatically on:
 - Manual workflow dispatch
 
 The CI runs tests across Python 3.10, 3.11, and 3.12 to ensure compatibility.
+
+## Monitoring and Visibility
+
+The pipeline includes comprehensive monitoring and visibility features:
+
+- **Real-time Progress Tracking**: Visual progress bars and status updates (with `rich`)
+- **Phase-level Metrics**: Track duration, API calls, and status for each phase
+- **Performance Metrics**: Total duration, API usage, token consumption
+- **JSON Metrics Export**: Detailed metrics saved to JSON files for analysis
+
+Enable with the `--metrics` flag:
+
+```bash
+ideation-claude --metrics "Your startup idea"
+```
+
+Metrics are saved to `metrics/{topic}_metrics.json` and include:
+- Phase-by-phase timing and status
+- API call counts
+- Token usage (when available)
+- Final scores and decisions
+
+📖 **See `MONITORING.md` for detailed documentation.**
 
 ## License
 
