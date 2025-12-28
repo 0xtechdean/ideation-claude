@@ -129,25 +129,34 @@ Customer Discovery: {customer_discovery[:500] if customer_discovery else 'N/A'}
 
 {f'Pivot Suggestions: {pivot_suggestions[:500]}' if pivot_suggestions and eliminated else ''}
 """
-        result = self.memory.add(
-            memory_text,
-            user_id=self.user_id,
-            metadata={
-                "type": "evaluated_idea",
-                "topic": topic,
-                "status": status.lower(),
-                "eliminated": eliminated,
-                "score": score,
-                "threshold": threshold,
-                "timestamp": datetime.now().isoformat(),
-            }
-        )
-        # Mem0 cloud returns queued result: {'results': [{'event_id': '...', 'status': 'PENDING'}]}
-        if isinstance(result, dict) and "results" in result and len(result["results"]) > 0:
-            event_id = result["results"][0].get("event_id", "unknown")
-            return event_id
-        # Fallback for local mode or different response format
-        return result.get("id", "unknown") if isinstance(result, dict) else "unknown"
+        try:
+            result = self.memory.add(
+                memory_text,
+                user_id=self.user_id,
+                metadata={
+                    "type": "evaluated_idea",
+                    "topic": topic,
+                    "status": status.lower(),
+                    "eliminated": eliminated,
+                    "score": score,
+                    "threshold": threshold,
+                    "timestamp": datetime.now().isoformat(),
+                }
+            )
+            # Mem0 cloud returns queued result: {'results': [{'event_id': '...', 'status': 'PENDING'}]}
+            if isinstance(result, dict) and "results" in result and len(result["results"]) > 0:
+                event_id = result["results"][0].get("event_id", "unknown")
+                if self._is_cloud:
+                    print(f"    [mem0] Memory queued for processing (event_id: {event_id[:8]}...)")
+                return event_id
+            # Fallback for local mode or different response format
+            memory_id = result.get("id", "unknown") if isinstance(result, dict) else "unknown"
+            if memory_id != "unknown" and not self._is_cloud:
+                print(f"    [mem0] Memory saved (id: {memory_id})")
+            return memory_id
+        except Exception as e:
+            print(f"    [mem0] Warning: Failed to save memory: {e}")
+            return "unknown"
 
     def save_eliminated_idea(
         self,
