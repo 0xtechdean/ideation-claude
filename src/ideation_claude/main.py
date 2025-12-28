@@ -201,7 +201,7 @@ async def interactive_mode(threshold: float, quiet: bool):
             break
 
         elif cmd == "help" or cmd == "h":
-            click.echo("Commands: add, list, clear, run, threshold, mode, help, quit")
+            click.echo("Commands: add, list, clear, run, threshold, help, quit")
 
         elif cmd == "add" or cmd == "a":
             if len(parts) > 1:
