@@ -1,6 +1,7 @@
 """CLI interface for Ideation-Claude."""
 
 import asyncio
+import sys
 from pathlib import Path
 
 import click
@@ -14,7 +15,34 @@ from .orchestrator import evaluate_idea, evaluate_ideas
 from .orchestrator_subagent import evaluate_with_subagents
 
 
-@click.group(invoke_without_command=True)
+class CustomGroup(click.Group):
+    """Custom group that handles extra arguments as topics."""
+    def parse_args(self, ctx, args):
+        # Parse known options first
+        remaining = []
+        topics = []
+        i = 0
+        while i < len(args):
+            arg = args[i]
+            # Check if it's an option
+            if arg.startswith('-'):
+                remaining.append(arg)
+                # If it's an option that takes a value, skip the next arg
+                if arg in ['-t', '--threshold', '-o', '--output']:
+                    i += 1
+                    if i < len(args):
+                        remaining.append(args[i])
+            else:
+                # It's a topic argument
+                topics.append(arg)
+            i += 1
+        
+        # Store topics in context
+        ctx.params['_topics'] = topics
+        return super().parse_args(ctx, remaining)
+
+
+@click.group(cls=CustomGroup, invoke_without_command=True)
 @click.option(
     "--threshold",
     "-t",
@@ -52,9 +80,8 @@ from .orchestrator_subagent import evaluate_with_subagents
     is_flag=True,
     help="Save detailed metrics to JSON file",
 )
-@click.argument("topics", nargs=-1, required=False)
 @click.pass_context
-def cli(ctx, threshold, output, interactive, quiet, subagent, metrics, topics):
+def cli(ctx, threshold, output, interactive, quiet, subagent, metrics):
     """Ideation-Claude: Multi-agent startup idea validator.
 
     Evaluate startup ideas using Claude CLI agents that perform:
@@ -81,7 +108,8 @@ def cli(ctx, threshold, output, interactive, quiet, subagent, metrics, topics):
         # Interactive mode
         ideation-claude --interactive
     """
-    topics = topics or []
+    # Get topics from context (parsed by CustomGroup)
+    topics = ctx.params.get('_topics', [])
     if interactive:
         asyncio.run(interactive_mode(threshold, quiet, subagent))
     elif topics:
