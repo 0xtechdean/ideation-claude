@@ -1,4 +1,8 @@
-"""CLI interface for Ideation-Claude."""
+"""CLI interface for Ideation-Claude Orchestrator.
+
+This is the central orchestrator that coordinates 9 specialized agent repositories
+via webhook triggers (repository_dispatch) and Mem0 for shared context.
+"""
 
 import asyncio
 import sys
@@ -11,8 +15,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from .memory import get_memory
-from .orchestrator import evaluate_idea, evaluate_ideas
-from .orchestrator_subagent import evaluate_with_subagents
+from .orchestrator_webhook import evaluate_with_webhooks
 
 
 @click.group(invoke_without_command=True, context_settings={'help_option_names': ['-h', '--help']})
@@ -30,22 +33,10 @@ from .orchestrator_subagent import evaluate_with_subagents
     help="Save report to file",
 )
 @click.option(
-    "--interactive",
-    "-i",
-    is_flag=True,
-    help="Run in interactive mode",
-)
-@click.option(
     "--quiet",
     "-q",
     is_flag=True,
     help="Suppress progress output",
-)
-@click.option(
-    "--metrics",
-    "-m",
-    is_flag=True,
-    help="Save detailed metrics to JSON file",
 )
 @click.option(
     "--problem-only",
@@ -54,47 +45,33 @@ from .orchestrator_subagent import evaluate_with_subagents
     help="Only run problem validation phase (focus on validating the problem)",
 )
 @click.pass_context
-def cli(ctx, threshold, output, interactive, quiet, metrics, problem_only):
-    """Ideation-Claude: Multi-agent problem validator and solution finder.
+def cli(ctx, threshold, output, quiet, problem_only):
+    """Ideation-Claude Orchestrator: Multi-agent problem validator.
 
-    Validate problems and find solutions using Claude CLI agents that perform:
-    - Problem validation (market research, pain points, market sizing)
-    - Customer discovery planning (Mom Test)
-    - Solution validation (competitive analysis, technical feasibility)
-    - Lean Startup hypothesis extraction and MVP definition
-    - 16-criteria scoring (8 problem-focused + 8 solution-focused)
-    - Alternative approaches for eliminated problems
+    Coordinates 9 specialized agents via webhook triggers to evaluate startup problems:
+    - Problem validation (research, market analysis, customer discovery)
+    - Solution validation (competitive analysis, feasibility, MVP definition)
+    - Scoring and recommendations
 
     Examples:
 
-        # Evaluate a single problem
+        # Evaluate a problem
         ideation-claude "Legal research is too time-consuming and expensive"
 
-        # Evaluate multiple problems
-        ideation-claude "Finding sustainable packaging is difficult" "Personal finance management is confusing"
-
         # With custom threshold
-        ideation-claude --threshold 6.0 "Your idea"
+        ideation-claude --threshold 6.0 "Your problem"
 
-        # Interactive mode
-        ideation-claude --interactive
+        # Problem validation only
+        ideation-claude --problem-only "Your problem"
     """
     # Get topics from remaining args
-    # Click groups with invoke_without_command still try to match commands
-    # So we need to check ctx.args (remaining unparsed args) or ctx.params
     topics = []
     if ctx.invoked_subcommand is None:
-        # Check if there are remaining args that weren't matched as commands
-        # These should be topics
         remaining_args = getattr(ctx, 'args', [])
         if not remaining_args:
-            # Try to get from params if stored there
-            remaining_args = ctx.params.get('_topics', [])
-        if not remaining_args:
-            # Last resort: parse sys.argv manually
             known_commands = {'add', 'pending', 'search', 'list', 'similar', 'insights'}
             skip_next = False
-            for arg in sys.argv[1:]:  # Skip script name
+            for arg in sys.argv[1:]:
                 if skip_next:
                     skip_next = False
                     continue
@@ -106,34 +83,29 @@ def cli(ctx, threshold, output, interactive, quiet, metrics, problem_only):
                     topics.append(arg)
         else:
             topics = remaining_args
-    
-    if interactive:
-        asyncio.run(interactive_mode(threshold, quiet))
-    elif topics:
-        asyncio.run(run_evaluation(list(topics), threshold, output, not quiet, metrics, problem_only))
+
+    if topics:
+        run_evaluation(list(topics), threshold, output, not quiet, problem_only)
     elif ctx.invoked_subcommand is None:
         click.echo(ctx.get_help())
 
 
-async def run_evaluation(
+def run_evaluation(
     problems: list[str],
     threshold: float,
     output: str | None,
     verbose: bool,
-    metrics: bool = False,
     problem_only: bool = False,
 ):
-    """Run the evaluation pipeline using sub-agent orchestrator."""
-    from .monitoring import PipelineMonitor
-    
+    """Run the evaluation pipeline using webhook-triggered agents."""
     results = []
     for problem in problems:
-        if metrics:
-            with PipelineMonitor(problem, threshold, verbose, "subagent") as monitor:
-                result = await evaluate_with_subagents(problem, threshold, verbose, problem_only=problem_only)
-                monitor.complete_evaluation(result.total_score, result.eliminated)
-        else:
-            result = await evaluate_with_subagents(problem, threshold, verbose, problem_only=problem_only)
+        result = evaluate_with_webhooks(
+            problem,
+            threshold=threshold,
+            problem_only=problem_only,
+            verbose=verbose,
+        )
         results.append(result)
 
     # Print summary
@@ -151,13 +123,13 @@ async def run_evaluation(
 
     if passed:
         click.echo("\nPASSED PROBLEMS:")
-        for r in sorted(passed, key=lambda x: x.total_score, reverse=True):
-            click.echo(f"  - {r.topic}: {r.total_score}/10")
+        for r in sorted(passed, key=lambda x: x.score, reverse=True):
+            click.echo(f"  - {r.problem[:50]}...: {r.score}/10")
 
     if eliminated:
         click.echo("\nELIMINATED PROBLEMS:")
-        for r in sorted(eliminated, key=lambda x: x.total_score, reverse=True):
-            click.echo(f"  - {r.topic}: {r.total_score}/10")
+        for r in sorted(eliminated, key=lambda x: x.score, reverse=True):
+            click.echo(f"  - {r.problem[:50]}...: {r.score}/10")
 
     # Save report if requested
     if output:
@@ -166,110 +138,30 @@ async def run_evaluation(
         click.echo(f"\nReport saved to: {output}")
 
 
-async def interactive_mode(threshold: float, quiet: bool):
-    """Run in interactive mode."""
-    topics: list[str] = []
-
-    click.echo("Ideation-Claude Interactive Mode")
-    click.echo("=" * 40)
-    click.echo("Commands:")
-    click.echo("  add <idea>  - Add an idea to evaluate")
-    click.echo("  list        - Show current ideas")
-    click.echo("  clear       - Clear all ideas")
-    click.echo("  run         - Run evaluation on all ideas")
-    click.echo("  threshold   - Set elimination threshold")
-    click.echo("  mode        - Toggle sub-agent mode")
-    click.echo("  help        - Show this help")
-    click.echo("  quit        - Exit")
-    click.echo()
-
-    while True:
-        try:
-            command = click.prompt("ideation", type=str).strip()
-        except (EOFError, KeyboardInterrupt):
-            click.echo("\nGoodbye!")
-            break
-
-        if not command:
-            continue
-
-        parts = command.split(maxsplit=1)
-        cmd = parts[0].lower()
-
-        if cmd == "quit" or cmd == "exit" or cmd == "q":
-            click.echo("Goodbye!")
-            break
-
-        elif cmd == "help" or cmd == "h":
-            click.echo("Commands: add, list, clear, run, threshold, help, quit")
-
-        elif cmd == "add" or cmd == "a":
-            if len(parts) > 1:
-                problem = " ".join(parts[1:])
-                topics.append(problem)
-                click.echo(f"Added: {problem}")
-            else:
-                click.echo("Usage: add <problem>")
-
-        elif cmd == "list" or cmd == "l":
-            if topics:
-                click.echo("Current problems:")
-                for i, problem in enumerate(topics, 1):
-                    click.echo(f"  {i}. {problem}")
-            else:
-                click.echo("No problems added yet. Use 'add <problem>' to add one.")
-
-        elif cmd == "clear" or cmd == "c":
-            topics.clear()
-            click.echo("All ideas cleared.")
-
-        elif cmd == "run" or cmd == "r":
-            if not topics:
-                click.echo("No problems to evaluate. Use 'add <problem>' first.")
-            else:
-                await run_evaluation(topics, threshold, None, not quiet, False, False)
-                topics.clear()
-
-        elif cmd == "threshold" or cmd == "t":
-            if len(parts) > 1:
-                try:
-                    threshold = float(parts[1])
-                    click.echo(f"Threshold set to: {threshold}")
-                except ValueError:
-                    click.echo("Invalid threshold. Use a number between 1-10.")
-            else:
-                click.echo(f"Current threshold: {threshold}")
-
-        else:
-            # Treat as a problem to add
-            topics.append(command)
-            click.echo(f"Added: {command}")
-
-
 @cli.command()
 @click.argument("problem")
 def add(problem):
     """Add a pending problem to Mem0 for later evaluation."""
     memory = get_memory()
-    memory_id = memory.save_pending_idea(topic)
+    memory_id = memory.save_pending_idea(problem)
     if memory_id != "unknown":
-        click.echo(f"✓ Added pending idea: {topic}")
+        click.echo(f"Added pending problem: {problem}")
         click.echo(f"  Memory ID: {memory_id[:8]}...")
     else:
-        click.echo(f"✗ Failed to add idea: {topic}")
+        click.echo(f"Failed to add problem: {problem}")
 
 
 @cli.command()
 @click.option("--limit", "-l", default=50, help="Maximum number of results")
 def pending(limit):
-    """List all pending ideas from Mem0."""
+    """List all pending problems from Mem0."""
     memory = get_memory()
     ideas = memory.get_pending_ideas(limit=limit)
     if not ideas:
-        click.echo("No pending ideas found.")
+        click.echo("No pending problems found.")
         return
-    
-    click.echo(f"Found {len(ideas)} pending idea(s):")
+
+    click.echo(f"Found {len(ideas)} pending problem(s):")
     for i, idea in enumerate(ideas, 1):
         meta = idea.get("metadata", {})
         topic = meta.get("topic", "Unknown")
@@ -282,15 +174,15 @@ def pending(limit):
 @click.argument("query")
 @click.option("--limit", "-l", default=5, help="Maximum number of results")
 def search(query, limit):
-    """Search memory for similar ideas and insights."""
+    """Search memory for similar problems and insights."""
     memory = get_memory()
     results = memory.search_similar_ideas(query, limit=limit)
-    
+
     if not results:
-        click.echo(f"No similar ideas found for: {query}")
+        click.echo(f"No similar problems found for: {query}")
         return
-    
-    click.echo(f"\nFound {len(results)} similar ideas:\n")
+
+    click.echo(f"\nFound {len(results)} similar problems:\n")
     for i, result in enumerate(results, 1):
         meta = result.get("metadata", {})
         topic = meta.get("topic", "Unknown")
@@ -303,18 +195,18 @@ def search(query, limit):
 
 @cli.command()
 @click.option("--status", "-s", type=click.Choice(["passed", "eliminated", "all"]), default="all", help="Filter by status")
-@click.option("--limit", "-l", default=20, help="Maximum number of ideas to show")
+@click.option("--limit", "-l", default=20, help="Maximum number of problems to show")
 def list(status, limit):
-    """List all evaluated ideas from memory."""
+    """List all evaluated problems from memory."""
     memory = get_memory()
     status_filter = None if status == "all" else status
     ideas = memory.get_all_ideas(status=status_filter, limit=limit)
-    
+
     if not ideas:
-        click.echo("No ideas found in memory.")
+        click.echo("No problems found in memory.")
         return
-    
-    click.echo(f"\nFound {len(ideas)} ideas:\n")
+
+    click.echo(f"\nFound {len(ideas)} problems:\n")
     for i, idea in enumerate(ideas, 1):
         meta = idea.get("metadata", {})
         topic = meta.get("topic", "Unknown")
@@ -330,18 +222,18 @@ def list(status, limit):
 @cli.command()
 @click.argument("topic")
 def similar(topic):
-    """Check if a similar idea was previously evaluated."""
+    """Check if a similar problem was previously evaluated."""
     memory = get_memory()
     similar_idea = memory.check_if_similar_eliminated(topic)
-    
+
     if similar_idea:
         meta = similar_idea.get("metadata", {})
-        click.echo(f"\n⚠ Found similar idea: {meta.get('topic', 'Unknown')}")
+        click.echo(f"\nFound similar problem: {meta.get('topic', 'Unknown')}")
         click.echo(f"   Status: {meta.get('status', 'unknown').upper()}")
         click.echo(f"   Score: {meta.get('score', 0.0)}/10")
         click.echo(f"   Date: {meta.get('timestamp', 'Unknown')}")
     else:
-        click.echo(f"\n✓ No similar eliminated ideas found for: {topic}")
+        click.echo(f"\nNo similar eliminated problems found for: {topic}")
 
 
 @cli.command()
@@ -351,11 +243,11 @@ def insights(query, limit):
     """Get market insights from past evaluations."""
     memory = get_memory()
     insights_list = memory.get_market_insights(query, limit=limit)
-    
+
     if not insights_list:
         click.echo(f"No insights found for: {query}")
         return
-    
+
     click.echo(f"\nFound {len(insights_list)} market insights:\n")
     for i, insight in enumerate(insights_list, 1):
         meta = insight.get("metadata", {})
@@ -370,10 +262,7 @@ def main():
     try:
         cli(standalone_mode=False)
     except (click.ClickException, SystemExit, Exception) as e:
-        # Click raises SystemExit or ClickException for command errors
-        # Try to handle as evaluation
         if isinstance(e, SystemExit) and e.code == 0:
-            # Normal exit, don't handle
             raise
         _handle_as_evaluation()
 
@@ -392,19 +281,15 @@ def _handle_as_evaluation():
                 skip_next = True
             continue
         if arg in known_commands:
-            # It's actually a command, don't handle as evaluation
             return
         topics.append(arg)
-    
+
     if topics:
-        # Treat as evaluation
         threshold = 5.0
         output = None
         quiet = False
         problem_only = False
-        metrics = False
-        
-        # Parse options from sys.argv
+
         i = 0
         while i < len(sys.argv) - 1:
             arg = sys.argv[i + 1]
@@ -422,11 +307,9 @@ def _handle_as_evaluation():
                 quiet = True
             elif arg == '--problem-only' or arg == '-p':
                 problem_only = True
-            elif arg == '--metrics' or arg == '-m':
-                metrics = True
             i += 1
-        
-        asyncio.run(run_evaluation(topics, threshold, output, not quiet, metrics, problem_only))
+
+        run_evaluation(topics, threshold, output, not quiet, problem_only)
 
 
 if __name__ == "__main__":

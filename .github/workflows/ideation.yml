@@ -21,11 +21,6 @@ on:
         required: false
         default: '5.0'
         type: string
-      subagent:
-        description: 'Use sub-agent orchestrator mode'
-        required: false
-        default: false
-        type: boolean
       quiet:
         description: 'Suppress progress output'
         required: false
