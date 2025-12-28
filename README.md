@@ -122,15 +122,26 @@ graph TB
 - **SubAgentOrchestrator**: Sub-agent mode - single coordinator spawns specialized sub-agents
 - Manages pipeline state, phase transitions, and result aggregation
 
-**Evaluation Pipeline (8 Phases)**
-1. **Market Research**: Industry trends, market dynamics
-2. **Competitive Analysis**: Competitor landscape, differentiation
-3. **Market Sizing**: TAM/SAM/SOM calculations
-4. **Technical Feasibility**: Technology requirements, implementation complexity
-5. **Lean Startup**: Hypothesis extraction, validation approach
-6. **Mom Test**: Customer discovery planning, interview strategies
-7. **Scoring**: 8-criteria evaluation (1-10 scale)
-8. **Pivot Suggestions**: Alternative directions for eliminated ideas
+**Evaluation Pipeline (Split into Problem & Solution Validation)**
+
+The evaluation is split into two distinct phases, with a focus on problem validation first:
+
+**Problem Validation Phase** (Runs First):
+1. **Market Research**: Industry trends, customer pain points
+2. **Market Sizing**: TAM/SAM/SOM calculations
+3. **Customer Discovery**: Mom Test interview planning
+4. **Problem Scoring**: 8 problem-focused criteria (Problem Clarity, Market Need, Market Size, Customer Validation, Problem Urgency, Problem Frequency, Problem Severity, Evidence Quality)
+
+**Solution Validation Phase** (Runs After Problem Validation Passes):
+1. **Competitive Analysis**: Competitor landscape, differentiation
+2. **Technical Feasibility**: Technology requirements, implementation complexity, resource availability
+3. **Lean Startup**: Hypothesis extraction, MVP definition
+4. **Solution Scoring**: 8 solution-focused criteria (Solution Fit, Competitive Advantage, Technical Feasibility, Resource Availability, MVP Clarity, Assumption Testability, Solution Timing, Solution Scalability)
+
+**Final Decision**:
+- Combined score: 60% problem + 40% solution (weighted)
+- Early elimination if problem validation fails
+- Pivot suggestions for eliminated ideas
 
 **Memory Service (Mem0)**
 - Stores all evaluated ideas and their outcomes
@@ -148,44 +159,75 @@ graph TB
 
 1. **Input**: User provides idea(s) via CLI or GitHub Actions
 2. **Orchestration**: Orchestrator initializes pipeline state
-3. **Phase Execution**: Each phase runs its specialized agent
-4. **Context Retrieval**: Agents query Mem0 for relevant past evaluations
-5. **Agent Execution**: Claude Code CLI agents perform analysis
-6. **Memory Storage**: Phase outputs saved to Mem0
-7. **Scoring**: Final score calculated from 8 criteria
-8. **Decision**: Idea passes (score ≥ threshold) or is eliminated
-9. **Output**: Report generated with full analysis and recommendations
+3. **Problem Validation Phase**:
+   - Market research and pain point analysis
+   - Market sizing (TAM/SAM/SOM)
+   - Customer discovery planning
+   - Problem scoring (8 problem-focused criteria)
+4. **Early Elimination Check**: If problem validation fails, stop and eliminate
+5. **Solution Validation Phase** (if problem validated):
+   - Competitor analysis
+   - Technical feasibility assessment
+   - Hypothesis and MVP definition
+   - Solution scoring (8 solution-focused criteria)
+6. **Context Retrieval**: Agents query Mem0 for relevant past evaluations throughout
+7. **Agent Execution**: Claude Code CLI agents perform analysis
+8. **Memory Storage**: Phase outputs saved to Mem0
+9. **Final Scoring**: Combined score (60% problem + 40% solution)
+10. **Decision**: Idea passes (combined score ≥ threshold) or is eliminated
+11. **Output**: Report generated with full analysis and recommendations
 
 ## Features
 
+- **Problem-First Validation**: Validates the problem before evaluating the solution
+- **Early Elimination**: Stops immediately if problem validation fails, saving time and resources
 - **9 Specialized Agents**: Each with a specific role in the validation pipeline
-- **Parallel Execution**: Independent agents run concurrently for faster evaluation
+- **Two-Phase Pipeline**: Problem validation (4 phases) → Solution validation (4 phases)
+- **Weighted Scoring**: 60% problem score + 40% solution score for final decision
+- **Problem-Only Mode**: `--problem-only` flag to focus solely on problem validation
 - **Lean Startup Methodology**: Hypothesis extraction and MVP definition
 - **Mom Test Framework**: Customer discovery interview planning
-- **8-Criteria Scoring**: Objective evaluation with go/no-go decisions
+- **16-Criteria Scoring**: 8 problem-focused + 8 solution-focused criteria
 - **Pivot Suggestions**: Strategic alternatives for eliminated ideas
 - **Memory Integration**: Comprehensive Mem0 integration for storing all ideas, phase outputs, and building a knowledge base
 
-## Pipeline (Optimized with Parallel Execution)
+## Pipeline (Problem-First Validation with Early Elimination)
 
 ```
-Phase 1: Research
+PROBLEM VALIDATION PHASE (Focus on Problem)
+Phase 1: Market Research (Pain Points & Trends)
             ↓
-Phase 2: ┌─ Competitor Analysis ─┐
-         ├─ Market Sizing       ─┼─ (parallel)
-         └─ Resource Discovery  ─┘
+Phase 2: Market Sizing (TAM/SAM/SOM)
             ↓
-Phase 3: Hypothesis & MVP (Lean Startup)
+Phase 3: Customer Discovery (Mom Test Planning)
             ↓
-Phase 4: Customer Discovery (Mom Test)
+Phase 4: Problem Scoring (8 problem-focused criteria)
             ↓
-Phase 5: Scoring (8 criteria)
-            ↓
-Phase 6: ┌─ Pivot Suggestions ─┐
-         └─ Report Generation ─┘ (parallel, if eliminated)
+         ┌─ Problem Validated? ─┐
+         │                      │
+         NO                     YES
+         │                      │
+         ↓                      ↓
+    ELIMINATE          SOLUTION VALIDATION PHASE
+    (Stop Early)       (Focus on Solution)
+                            ↓
+                    Phase 1: Competitor Analysis
+                            ↓
+                    Phase 2: Technical Feasibility
+                            ↓
+                    Phase 3: Hypothesis & MVP
+                            ↓
+                    Phase 4: Solution Scoring (8 solution-focused criteria)
+                            ↓
+                    Phase 5: ┌─ Pivot Suggestions ─┐
+                             └─ Report Generation ─┘ (if eliminated)
 ```
 
-**9 agents, 6 phases** - Parallel execution reduces evaluation time significantly.
+**Key Features:**
+- **Problem-First Approach**: Validates the problem before evaluating the solution
+- **Early Elimination**: Stops immediately if problem validation fails
+- **Weighted Scoring**: 60% problem score + 40% solution score
+- **9 agents, 2-phase pipeline** - Focused validation reduces wasted effort on unvalidated problems
 
 ## Installation
 
@@ -251,6 +293,12 @@ ideation-claude --subagent "Your idea"
 
 # With metrics and monitoring
 ideation-claude --metrics "Your idea"
+
+# Problem validation only (focus on validating the problem)
+ideation-claude --problem-only "Your idea"
+
+# Full validation (problem + solution, default)
+ideation-claude "Your idea"
 ```
 
 ### Docker Usage
@@ -285,6 +333,13 @@ docker run --rm \
   -v "$PWD/reports:/app/reports" \
   ideation-claude:latest \
   --subagent "Your idea"
+
+# Problem validation only
+docker run --rm \
+  -v "$PWD/.env:/app/.env:ro" \
+  -v "$PWD/reports:/app/reports" \
+  ideation-claude:latest \
+  --problem-only "Your idea"
 ```
 
 **Using docker-compose (recommended):**
@@ -547,6 +602,7 @@ This project includes GitHub Actions workflows that allow you to run evaluations
    | `ideas_file` | Path to ideas file (e.g., `.github/ideas.txt`). Overrides `idea` if provided | No | - |
    | `threshold` | Elimination threshold (1-10) | No | `5.0` |
    | `subagent` | Use sub-agent orchestrator mode | No | `false` |
+   | `problem_only` | Only run problem validation phase | No | `false` |
    | `quiet` | Suppress progress output | No | `false` |
    | `python_version` | Python version to use | No | `3.10` |
    | `artifact_retention_days` | Days to retain artifacts (0 = forever) | No | `30` |
@@ -579,6 +635,14 @@ gh workflow run ideation.yml \
   -f ideas_file=".github/ideas.txt" \
   -f threshold=6.0 \
   -f quiet=true
+```
+
+**Problem validation only:**
+```bash
+gh workflow run ideation.yml \
+  -f idea="Your idea" \
+  -f problem_only=true \
+  -f threshold=5.0
 ```
 
 **With custom Python version:**
