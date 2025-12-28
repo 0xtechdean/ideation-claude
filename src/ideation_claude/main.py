@@ -42,12 +42,6 @@ from .orchestrator_subagent import evaluate_with_subagents
     help="Suppress progress output",
 )
 @click.option(
-    "--subagent",
-    "-s",
-    is_flag=True,
-    help="Use sub-agent orchestrator (single coordinator spawns sub-agents)",
-)
-@click.option(
     "--metrics",
     "-m",
     is_flag=True,
@@ -60,7 +54,7 @@ from .orchestrator_subagent import evaluate_with_subagents
     help="Only run problem validation phase (focus on validating the problem)",
 )
 @click.pass_context
-def cli(ctx, threshold, output, interactive, quiet, subagent, metrics, problem_only):
+def cli(ctx, threshold, output, interactive, quiet, metrics, problem_only):
     """Ideation-Claude: Multi-agent problem validator and solution finder.
 
     Validate problems and find solutions using Claude CLI agents that perform:
@@ -114,9 +108,9 @@ def cli(ctx, threshold, output, interactive, quiet, subagent, metrics, problem_o
             topics = remaining_args
     
     if interactive:
-        asyncio.run(interactive_mode(threshold, quiet, subagent))
+        asyncio.run(interactive_mode(threshold, quiet))
     elif topics:
-        asyncio.run(run_evaluation(list(topics), threshold, output, not quiet, subagent, metrics, problem_only))
+        asyncio.run(run_evaluation(list(topics), threshold, output, not quiet, metrics, problem_only))
     elif ctx.invoked_subcommand is None:
         click.echo(ctx.get_help())
 
@@ -126,36 +120,21 @@ async def run_evaluation(
     threshold: float,
     output: str | None,
     verbose: bool,
-    subagent: bool = False,
     metrics: bool = False,
     problem_only: bool = False,
 ):
-    """Run the evaluation pipeline."""
+    """Run the evaluation pipeline using sub-agent orchestrator."""
     from .monitoring import PipelineMonitor
     
-    if subagent:
-        # Use sub-agent orchestrator (single coordinator spawns sub-agents)
-        if verbose:
-            click.echo("Using sub-agent orchestrator mode...")
-        results = []
-        for problem in problems:
-            if metrics:
-                with PipelineMonitor(problem, threshold, verbose, "subagent") as monitor:
-                    result = await evaluate_with_subagents(problem, threshold, verbose)
-                    monitor.complete_evaluation(result.total_score, result.eliminated)
-            else:
-                result = await evaluate_with_subagents(problem, threshold, verbose)
-            results.append(result)
-    elif len(problems) == 1:
+    results = []
+    for problem in problems:
         if metrics:
-            with PipelineMonitor(problems[0], threshold, verbose, "direct") as monitor:
-                result = await evaluate_idea(problems[0], threshold, verbose, monitor=monitor, problem_only=problem_only)
+            with PipelineMonitor(problem, threshold, verbose, "subagent") as monitor:
+                result = await evaluate_with_subagents(problem, threshold, verbose, problem_only=problem_only)
                 monitor.complete_evaluation(result.total_score, result.eliminated)
         else:
-            result = await evaluate_idea(problems[0], threshold, verbose, problem_only=problem_only)
-        results = [result]
-    else:
-        results = await evaluate_ideas(problems, threshold, verbose)
+            result = await evaluate_with_subagents(problem, threshold, verbose, problem_only=problem_only)
+        results.append(result)
 
     # Print summary
     click.echo("\n" + "=" * 60)
@@ -187,13 +166,11 @@ async def run_evaluation(
         click.echo(f"\nReport saved to: {output}")
 
 
-async def interactive_mode(threshold: float, quiet: bool, subagent: bool = False):
+async def interactive_mode(threshold: float, quiet: bool):
     """Run in interactive mode."""
     topics: list[str] = []
 
     click.echo("Ideation-Claude Interactive Mode")
-    if subagent:
-        click.echo("(Sub-agent orchestrator mode)")
     click.echo("=" * 40)
     click.echo("Commands:")
     click.echo("  add <idea>  - Add an idea to evaluate")
@@ -250,13 +227,8 @@ async def interactive_mode(threshold: float, quiet: bool, subagent: bool = False
             if not topics:
                 click.echo("No problems to evaluate. Use 'add <problem>' first.")
             else:
-                await run_evaluation(topics, threshold, None, not quiet, subagent, False, False)
+                await run_evaluation(topics, threshold, None, not quiet, False, False)
                 topics.clear()
-
-        elif cmd == "mode" or cmd == "m":
-            subagent = not subagent
-            mode_name = "sub-agent" if subagent else "direct SDK"
-            click.echo(f"Switched to {mode_name} orchestrator mode.")
 
         elif cmd == "threshold" or cmd == "t":
             if len(parts) > 1:
@@ -429,7 +401,7 @@ def _handle_as_evaluation():
         threshold = 5.0
         output = None
         quiet = False
-        subagent = False
+        problem_only = False
         metrics = False
         
         # Parse options from sys.argv
@@ -448,13 +420,13 @@ def _handle_as_evaluation():
                     continue
             elif arg == '--quiet' or arg == '-q':
                 quiet = True
-            elif arg == '--subagent' or arg == '-s':
-                subagent = True
+            elif arg == '--problem-only' or arg == '-p':
+                problem_only = True
             elif arg == '--metrics' or arg == '-m':
                 metrics = True
             i += 1
         
-        asyncio.run(run_evaluation(topics, threshold, output, not quiet, subagent, metrics, False))
+        asyncio.run(run_evaluation(topics, threshold, output, not quiet, metrics, problem_only))
 
 
 if __name__ == "__main__":

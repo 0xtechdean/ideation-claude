@@ -19,9 +19,9 @@ from typing import Optional
 from claude_code_sdk import query, ClaudeCodeOptions
 
 
-COORDINATOR_PROMPT = """You are an Ideation Coordinator that evaluates startup ideas.
+COORDINATOR_PROMPT = """You are an Ideation Coordinator that validates problems and finds solutions.
 
-Your job is to orchestrate a multi-phase evaluation pipeline by spawning specialized sub-agents using the Task tool.
+Your job is to orchestrate a two-phase evaluation pipeline by spawning specialized sub-agents using the Task tool.
 
 ## Available Sub-Agent Types
 
@@ -31,57 +31,87 @@ Use the Task tool with these subagent_type values:
 
 ## Evaluation Pipeline
 
-For each startup idea, run these phases IN ORDER:
+For each problem statement, run these phases IN ORDER:
 
-### Phase 1: Research (spawn in parallel)
-Spawn 3 sub-agents simultaneously:
-1. **Market Researcher**: Research market trends and customer pain points
-2. **Competitor Analyst**: Find and analyze competitors
-3. **Market Sizer**: Estimate TAM/SAM/SOM
+### PROBLEM VALIDATION PHASE (Run First)
 
-### Phase 2: Technical Assessment
+#### Phase 1: Market Research
 Spawn 1 sub-agent:
-- **Resource Scout**: Find datasets, APIs, tools and assess technical feasibility
+- **Market Researcher**: Research market trends and customer pain points for the problem
 
-### Phase 3: Lean Startup Analysis
+#### Phase 2: Market Sizing
 Spawn 1 sub-agent:
-- **Hypothesis Architect**: Extract riskiest assumptions and define MVP
+- **Market Sizer**: Estimate TAM/SAM/SOM for the problem
 
-### Phase 4: Customer Discovery
+#### Phase 3: Customer Discovery
 Spawn 1 sub-agent:
-- **Interview Planner**: Design Mom Test interview framework
+- **Interview Planner**: Design Mom Test interview framework to validate the problem
 
-### Phase 5: Scoring
-YOU (the coordinator) should score the idea based on all gathered information.
-Score on 8 criteria (1-10 each):
-1. Market Size
-2. Competition (inverted - low competition = high score)
-3. Differentiation
-4. Technical Feasibility
-5. Timing
-6. Resource Availability
-7. Assumption Testability
-8. Evidence Quality
+#### Phase 4: Problem Validation Scoring
+YOU (the coordinator) should score the PROBLEM VALIDATION based on all gathered information.
+Score on 8 problem-focused criteria (1-10 each):
+1. Problem Clarity: How clearly defined is the problem? Is it a real pain point?
+2. Market Need: How strong is the market demand for solving this problem?
+3. Market Size: What is the addressable market size (TAM/SAM/SOM)?
+4. Customer Validation: How testable/validatable is the problem with customers?
+5. Problem Urgency: How urgent is solving this problem for customers?
+6. Problem Frequency: How often do customers encounter this problem?
+7. Problem Severity: How severe is the pain when customers face this problem?
+8. Evidence Quality: What evidence exists that this is a real problem?
 
-Calculate average. If score < {threshold}, mark as ELIMINATED.
+Calculate average. If score < {threshold}, mark as ELIMINATED and STOP (do not proceed to solution validation).
 
-### Phase 6: Pivot Suggestions (if eliminated)
+### SOLUTION VALIDATION PHASE (Only if Problem Validated)
+
+#### Phase 5: Competitor Analysis
 Spawn 1 sub-agent:
-- **Pivot Advisor**: Suggest 3-5 strategic pivots
+- **Competitor Analyst**: Find and analyze existing solutions and competitors for solving this problem
 
-### Phase 7: Report
+#### Phase 6: Technical Feasibility
+Spawn 1 sub-agent:
+- **Resource Scout**: Find datasets, APIs, tools and assess technical feasibility for solving the problem
+
+#### Phase 7: Lean Startup Analysis
+Spawn 1 sub-agent:
+- **Hypothesis Architect**: Extract riskiest assumptions and define MVP for solving the problem
+
+#### Phase 8: Solution Validation Scoring
+YOU (the coordinator) should score the SOLUTION VALIDATION based on all gathered information.
+Score on 8 solution-focused criteria (1-10 each):
+1. Solution Fit: How well does the solution address the validated problem?
+2. Competitive Advantage: How differentiated is this solution from competitors?
+3. Technical Feasibility: How feasible is building this solution?
+4. Resource Availability: What resources/tools/APIs are available to build this?
+5. MVP Clarity: How clear and testable is the MVP?
+6. Assumption Testability: How easy/cheap is it to test key assumptions?
+7. Solution Timing: Is the timing right for this solution?
+8. Solution Scalability: Can this solution scale effectively?
+
+Calculate average. Combined score = (Problem Score * 0.6) + (Solution Score * 0.4)
+If combined score < {threshold}, mark as ELIMINATED.
+
+### Phase 9: Pivot Suggestions (if eliminated)
+Spawn 1 sub-agent:
+- **Pivot Advisor**: Suggest 3-5 alternative approaches for solving this problem
+
+### Phase 10: Report
 Compile all findings into a comprehensive evaluation report.
 
 ## Important Instructions
 
-1. Always spawn parallel sub-agents in a SINGLE message with multiple Task tool calls
+1. Always spawn parallel sub-agents in a SINGLE message with multiple Task tool calls when possible
 2. Wait for all sub-agents to complete before moving to the next phase
 3. Pass context summaries to sub-agents so they have necessary background
-4. Be thorough - this evaluation will determine if the idea is worth pursuing
+4. If problem validation fails (score < {threshold}), STOP and do not proceed to solution validation
+5. Be thorough - this evaluation will determine if the problem is worth solving
 
 ## Output Format
 
-After completing all phases, output a final report in markdown format.
+After completing all phases, output a final report in markdown format with:
+- Problem validation results and score
+- Solution validation results and score (if problem validated)
+- Combined score and final decision
+- Key findings from each phase
 """
 
 
@@ -103,15 +133,17 @@ class SubAgentOrchestrator:
     the Task tool to spawn specialized sub-agents.
     """
 
-    def __init__(self, topic: str, threshold: float = 5.0):
+    def __init__(self, problem: str, threshold: float = 5.0, problem_only: bool = False):
         """Initialize the orchestrator.
 
         Args:
-            topic: The startup idea/topic to evaluate
+            problem: The problem statement to validate and find solutions for
             threshold: Elimination threshold (default 5.0)
+            problem_only: If True, only run problem validation phase
         """
-        self.topic = topic
+        self.problem = problem
         self.threshold = threshold
+        self.problem_only = problem_only
 
     async def run(self, verbose: bool = True) -> SubAgentResult:
         """Run the sub-agent based evaluation pipeline.
@@ -123,24 +155,49 @@ class SubAgentOrchestrator:
             SubAgentResult with evaluation findings
         """
         if verbose:
-            print(f"  Starting sub-agent evaluation for: {self.topic}")
+            print(f"  Starting sub-agent evaluation for problem: {self.problem}")
             print(f"  Threshold: {self.threshold}")
+            if self.problem_only:
+                print(f"  Mode: Problem validation only")
 
-        # Build the coordinator prompt with the specific topic
+        # Build the coordinator prompt with the specific threshold
         system_prompt = COORDINATOR_PROMPT.format(threshold=self.threshold)
 
-        prompt = f"""Evaluate this startup idea: {self.topic}
+        if self.problem_only:
+            prompt = f"""Validate this problem: {self.problem}
 
 Elimination threshold: {self.threshold}
 
-Run the full evaluation pipeline:
-1. Spawn parallel sub-agents for research (market, competitors, sizing)
-2. Assess technical feasibility and resources
-3. Extract Lean Startup hypotheses and MVP definition
-4. Plan customer discovery interviews
-5. Score the opportunity (you do this yourself)
-6. If eliminated, suggest pivots
-7. Generate final report
+Run the PROBLEM VALIDATION phase only:
+1. Research market trends and customer pain points
+2. Estimate market size (TAM/SAM/SOM)
+3. Plan customer discovery interviews
+4. Score the problem validation (you do this yourself)
+5. Generate a problem validation report
+
+Use the Task tool to spawn sub-agents. Begin the evaluation now."""
+        else:
+            prompt = f"""Validate this problem and find solutions: {self.problem}
+
+Elimination threshold: {self.threshold}
+
+Run the full two-phase evaluation pipeline:
+1. PROBLEM VALIDATION PHASE:
+   - Research market trends and customer pain points
+   - Estimate market size (TAM/SAM/SOM)
+   - Plan customer discovery interviews
+   - Score the problem validation
+   - If problem validation fails, STOP and eliminate
+   
+2. SOLUTION VALIDATION PHASE (only if problem validated):
+   - Analyze existing solutions and competitors
+   - Assess technical feasibility and resources
+   - Extract Lean Startup hypotheses and MVP definition
+   - Score the solution validation
+   - Calculate combined score (60% problem + 40% solution)
+   
+3. If eliminated, suggest alternative approaches
+4. Generate final report
 
 Use the Task tool to spawn sub-agents. For parallel tasks, include multiple Task calls in a single message.
 
@@ -169,7 +226,7 @@ Begin the evaluation now."""
         eliminated = total_score < self.threshold or "ELIMINATED" in raw_output.upper()
 
         return SubAgentResult(
-            topic=self.topic,
+            topic=self.problem,
             report=raw_output,
             total_score=total_score,
             eliminated=eliminated,
@@ -202,21 +259,23 @@ Begin the evaluation now."""
 
 
 async def evaluate_with_subagents(
-    topic: str,
+    problem: str,
     threshold: float = 5.0,
     verbose: bool = True,
+    problem_only: bool = False,
 ) -> SubAgentResult:
-    """Evaluate an idea using the sub-agent based orchestrator.
+    """Evaluate a problem using the sub-agent based orchestrator.
 
     Args:
-        topic: The startup idea to evaluate
+        problem: The problem statement to validate and find solutions for
         threshold: Elimination threshold
         verbose: Whether to print progress
+        problem_only: If True, only run problem validation phase
 
     Returns:
         SubAgentResult with evaluation
     """
-    orchestrator = SubAgentOrchestrator(topic=topic, threshold=threshold)
+    orchestrator = SubAgentOrchestrator(problem=problem, threshold=threshold, problem_only=problem_only)
     return await orchestrator.run(verbose=verbose)
 
 
