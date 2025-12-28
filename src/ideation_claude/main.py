@@ -14,7 +14,7 @@ from .orchestrator import evaluate_idea, evaluate_ideas
 from .orchestrator_subagent import evaluate_with_subagents
 
 
-@click.group(invoke_without_command=True, allow_extra_args=True)
+@click.group(invoke_without_command=True, context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
 @click.option(
     "--threshold",
     "-t",
