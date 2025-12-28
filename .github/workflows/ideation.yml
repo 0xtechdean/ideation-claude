@@ -101,10 +101,20 @@ jobs:
           MEM0_API_KEY: ${{ secrets.MEM0_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
-          mkdir -p reports
+          echo "::group::🚀 Starting Evaluation"
+          echo "Workflow: ${{ github.workflow }}"
+          echo "Run ID: ${{ github.run_id }}"
+          echo "Triggered by: ${{ github.event_name }}"
+          echo "Branch: ${{ github.ref }}"
+          echo "Commit: ${{ github.sha }}"
+          echo "::endgroup::"
+          
+          mkdir -p reports metrics
           QUIET_FLAG=""
+          METRICS_FLAG="--metrics"
           if [ "${{ github.event.inputs.quiet }}" = "true" ]; then
             QUIET_FLAG="--quiet"
+            METRICS_FLAG=""
           fi
           
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
@@ -113,46 +123,92 @@ jobs:
             
             if [ -n "$IDEAS_FILE" ] && [ -f "$IDEAS_FILE" ]; then
               # Use specified ideas file
-              echo "Reading ideas from: $IDEAS_FILE"
+              echo "::group::📝 Reading ideas from file: $IDEAS_FILE"
+              IDEA_COUNT=0
               while IFS= read -r idea; do
                 [ -z "$idea" ] && continue
-                echo "Evaluating: $idea"
+                IDEA_COUNT=$((IDEA_COUNT + 1))
+                echo "  Idea $IDEA_COUNT: $idea"
+              done < "$IDEAS_FILE"
+              echo "Total ideas: $IDEA_COUNT"
+              echo "::endgroup::"
+              
+              IDEA_NUM=0
+              while IFS= read -r idea; do
+                [ -z "$idea" ] && continue
+                IDEA_NUM=$((IDEA_NUM + 1))
+                echo "::group::💡 Evaluating Idea $IDEA_NUM/$IDEA_COUNT: $idea"
+                OUTPUT_FILE="reports/$(echo "$idea" | tr ' ' '_' | tr -cd '[:alnum:]_').md"
                 if [ "${{ github.event.inputs.subagent }}" = "true" ]; then
-                  ideation-claude $QUIET_FLAG --subagent --threshold ${{ github.event.inputs.threshold }} "$idea" --output "reports/$(echo "$idea" | tr ' ' '_' | tr -cd '[:alnum:]_').md"
+                  ideation-claude $QUIET_FLAG $METRICS_FLAG --subagent --threshold ${{ github.event.inputs.threshold }} "$idea" --output "$OUTPUT_FILE"
                 else
-                  ideation-claude $QUIET_FLAG --threshold ${{ github.event.inputs.threshold }} "$idea" --output "reports/$(echo "$idea" | tr ' ' '_' | tr -cd '[:alnum:]_').md"
+                  ideation-claude $QUIET_FLAG $METRICS_FLAG --threshold ${{ github.event.inputs.threshold }} "$idea" --output "$OUTPUT_FILE"
                 fi
+                echo "✓ Report saved: $OUTPUT_FILE"
+                echo "::endgroup::"
               done < "$IDEAS_FILE"
             else
               # Use idea input (support comma-separated)
               IDEAS="${{ github.event.inputs.idea }}"
+              echo "::group::📝 Processing input ideas"
               IFS=',' read -ra IDEA_ARRAY <<< "$IDEAS"
-              for idea in "${IDEA_ARRAY[@]}"; do
-                idea=$(echo "$idea" | xargs)  # Trim whitespace
+              IDEA_COUNT=${#IDEA_ARRAY[@]}
+              echo "Total ideas: $IDEA_COUNT"
+              for i in "${!IDEA_ARRAY[@]}"; do
+                idea=$(echo "${IDEA_ARRAY[$i]}" | xargs)
                 [ -z "$idea" ] && continue
-                echo "Evaluating: $idea"
+                echo "  Idea $((i+1)): $idea"
+              done
+              echo "::endgroup::"
+              
+              for i in "${!IDEA_ARRAY[@]}"; do
+                idea=$(echo "${IDEA_ARRAY[$i]}" | xargs)
+                [ -z "$idea" ] && continue
+                echo "::group::💡 Evaluating Idea $((i+1))/$IDEA_COUNT: $idea"
+                OUTPUT_FILE="reports/$(echo "$idea" | tr ' ' '_' | tr -cd '[:alnum:]_').md"
                 if [ "${{ github.event.inputs.subagent }}" = "true" ]; then
-                  ideation-claude $QUIET_FLAG --subagent --threshold ${{ github.event.inputs.threshold }} "$idea" --output "reports/$(echo "$idea" | tr ' ' '_' | tr -cd '[:alnum:]_').md"
+                  ideation-claude $QUIET_FLAG $METRICS_FLAG --subagent --threshold ${{ github.event.inputs.threshold }} "$idea" --output "$OUTPUT_FILE"
                 else
-                  ideation-claude $QUIET_FLAG --threshold ${{ github.event.inputs.threshold }} "$idea" --output "reports/$(echo "$idea" | tr ' ' '_' | tr -cd '[:alnum:]_').md"
+                  ideation-claude $QUIET_FLAG $METRICS_FLAG --threshold ${{ github.event.inputs.threshold }} "$idea" --output "$OUTPUT_FILE"
                 fi
+                echo "✓ Report saved: $OUTPUT_FILE"
+                echo "::endgroup::"
               done
             fi
           else
             # Scheduled or push trigger - use default ideas file
             IDEAS_FILE=".github/ideas.txt"
             if [ -f "$IDEAS_FILE" ]; then
-              echo "Reading ideas from: $IDEAS_FILE"
+              echo "::group::📝 Reading ideas from: $IDEAS_FILE"
+              IDEA_COUNT=$(grep -v '^[[:space:]]*$' "$IDEAS_FILE" | wc -l)
+              echo "Total ideas: $IDEA_COUNT"
+              echo "::endgroup::"
+              
+              IDEA_NUM=0
               while IFS= read -r idea; do
                 [ -z "$idea" ] && continue
-                echo "Evaluating: $idea"
-                ideation-claude --quiet "$idea" --output "reports/$(echo "$idea" | tr ' ' '_' | tr -cd '[:alnum:]_').md"
+                IDEA_NUM=$((IDEA_NUM + 1))
+                echo "::group::💡 Evaluating Idea $IDEA_NUM/$IDEA_COUNT: $idea"
+                OUTPUT_FILE="reports/$(echo "$idea" | tr ' ' '_' | tr -cd '[:alnum:]_').md"
+                ideation-claude --quiet --metrics "$idea" --output "$OUTPUT_FILE"
+                echo "✓ Report saved: $OUTPUT_FILE"
+                echo "::endgroup::"
               done < "$IDEAS_FILE"
             else
-              echo "No ideas.txt file found. Create .github/ideas.txt with one idea per line."
+              echo "::error::No ideas.txt file found. Create .github/ideas.txt with one idea per line."
               exit 1
             fi
           fi
+          
+          echo "::group::📊 Evaluation Summary"
+          REPORT_COUNT=$(find reports -name "*.md" 2>/dev/null | wc -l)
+          METRICS_COUNT=$(find metrics -name "*.json" 2>/dev/null | wc -l)
+          echo "Reports generated: $REPORT_COUNT"
+          echo "Metrics files: $METRICS_COUNT"
+          if [ "$METRICS_COUNT" -gt 0 ]; then
+            echo "Metrics available in: metrics/"
+          fi
+          echo "::endgroup::"
 
       - name: Upload reports
         if: always()
@@ -161,8 +217,45 @@ jobs:
           name: evaluation-reports
           path: |
             reports/*.md
+            metrics/*.json
           if-no-files-found: ignore
           retention-days: ${{ github.event.inputs.artifact_retention_days || 30 }}
+
+      - name: Generate workflow summary
+        if: always()
+        run: |
+          echo "::group::📋 Workflow Summary"
+          echo "## Evaluation Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -d "reports" ] && [ "$(ls -A reports/*.md 2>/dev/null)" ]; then
+            echo "### Generated Reports" >> $GITHUB_STEP_SUMMARY
+            for report in reports/*.md; do
+              if [ -f "$report" ]; then
+                echo "- \`$(basename "$report")\`" >> $GITHUB_STEP_SUMMARY
+              fi
+            done
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ -d "metrics" ] && [ "$(ls -A metrics/*.json 2>/dev/null)" ]; then
+            echo "### Metrics Available" >> $GITHUB_STEP_SUMMARY
+            for metric in metrics/*.json; do
+              if [ -f "$metric" ]; then
+                echo "- \`$(basename "$metric")\`" >> $GITHUB_STEP_SUMMARY
+              fi
+            done
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "### Workflow Details" >> $GITHUB_STEP_SUMMARY
+          echo "- **Run ID**: \`${{ github.run_id }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Trigger**: \`${{ github.event_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch**: \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Download artifacts to view full reports and metrics." >> $GITHUB_STEP_SUMMARY
+          echo "::endgroup::"
 
       - name: Comment on PR
         if: github.event_name == 'pull_request'
