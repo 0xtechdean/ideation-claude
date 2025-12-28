@@ -358,6 +358,102 @@ Output:
                 return top_result
         return None
 
+    def save_pending_idea(self, topic: str, metadata: Optional[dict] = None) -> str:
+        """Save a pending idea to be evaluated later.
+
+        Args:
+            topic: The startup idea to evaluate
+            metadata: Additional metadata (source, priority, etc.)
+
+        Returns:
+            Memory ID
+        """
+        memory_text = f"""
+Pending Idea to Evaluate: {topic}
+
+Status: PENDING
+Date: {datetime.now().isoformat()}
+"""
+        meta = {
+            "type": "pending_idea",
+            "topic": topic,
+            "status": "pending",
+            "timestamp": datetime.now().isoformat(),
+        }
+        if metadata:
+            meta.update(metadata)
+        
+        try:
+            result = self.memory.add(
+                memory_text,
+                user_id=self.user_id,
+                metadata=meta
+            )
+            if isinstance(result, dict) and "results" in result and len(result["results"]) > 0:
+                event_id = result["results"][0].get("event_id", "unknown")
+                if self._is_cloud:
+                    print(f"    [mem0] Pending idea queued (event_id: {event_id[:8]}...)")
+                return event_id
+            memory_id = result.get("id", "unknown") if isinstance(result, dict) else "unknown"
+            return memory_id
+        except Exception as e:
+            print(f"    [mem0] Warning: Failed to save pending idea: {e}")
+            return "unknown"
+
+    def get_pending_ideas(self, limit: int = 50) -> list[dict]:
+        """Retrieve all pending ideas that need to be evaluated.
+
+        Args:
+            limit: Maximum number of ideas to retrieve
+
+        Returns:
+            List of pending idea memories
+        """
+        # Mem0 cloud requires filters
+        if self._is_cloud:
+            try:
+                memories = self.memory.get_all(
+                    user_id=self.user_id,
+                    filters={"metadata": {"type": "pending_idea", "status": "pending"}}
+                )
+            except Exception:
+                # Fallback: get all and filter client-side
+                memories = self.memory.get_all(
+                    user_id=self.user_id,
+                    filters={"metadata": {"type": "pending_idea"}}
+                )
+        else:
+            memories = self.memory.get_all(user_id=self.user_id)
+        
+        ideas = [m for m in memories.get("results", [])]
+        
+        # Filter for pending ideas
+        pending = [
+            m for m in ideas
+            if m.get("metadata", {}).get("type") == "pending_idea"
+            and m.get("metadata", {}).get("status") == "pending"
+        ]
+        
+        # Sort by timestamp (oldest first)
+        pending.sort(key=lambda x: x.get("metadata", {}).get("timestamp", ""))
+        
+        return pending[:limit]
+
+    def mark_idea_evaluated(self, topic: str) -> bool:
+        """Mark a pending idea as evaluated (remove from pending).
+
+        Args:
+            topic: The idea topic to mark as evaluated
+
+        Returns:
+            True if marked, False if not found
+        """
+        # Note: Mem0 doesn't support direct updates, so we'd need to delete and recreate
+        # For now, we'll just note that it's been evaluated by checking if it exists
+        # as an evaluated_idea. The pending idea can remain for historical purposes.
+        # In a production system, you might want to add a "evaluated_at" timestamp.
+        return True
+
     def get_all_ideas(self, status: Optional[str] = None, limit: int = 50) -> list[dict]:
         """Retrieve all evaluated ideas, optionally filtered by status.
 

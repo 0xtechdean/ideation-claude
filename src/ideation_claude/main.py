@@ -242,6 +242,38 @@ async def interactive_mode(threshold: float, quiet: bool, subagent: bool = False
 
 
 @cli.command()
+@click.argument("topic")
+def add(topic):
+    """Add a pending idea to Mem0 for later evaluation."""
+    memory = get_memory()
+    memory_id = memory.save_pending_idea(topic)
+    if memory_id != "unknown":
+        click.echo(f"✓ Added pending idea: {topic}")
+        click.echo(f"  Memory ID: {memory_id[:8]}...")
+    else:
+        click.echo(f"✗ Failed to add idea: {topic}")
+
+
+@cli.command()
+@click.option("--limit", "-l", default=50, help="Maximum number of results")
+def pending(limit):
+    """List all pending ideas from Mem0."""
+    memory = get_memory()
+    ideas = memory.get_pending_ideas(limit=limit)
+    if not ideas:
+        click.echo("No pending ideas found.")
+        return
+    
+    click.echo(f"Found {len(ideas)} pending idea(s):")
+    for i, idea in enumerate(ideas, 1):
+        meta = idea.get("metadata", {})
+        topic = meta.get("topic", "Unknown")
+        timestamp = meta.get("timestamp", "N/A")
+        click.echo(f"  {i}. {topic}")
+        click.echo(f"     Added: {timestamp}")
+
+
+@cli.command()
 @click.argument("query")
 @click.option("--limit", "-l", default=5, help="Maximum number of results")
 def search(query, limit):

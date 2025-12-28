@@ -86,7 +86,27 @@ jobs:
           
           IDEAS_FILE="${{ github.event.inputs.ideas_file }}"
           
-          if [ -n "$IDEAS_FILE" ] && [ -f "$IDEAS_FILE" ]; then
+          if [ -n "$IDEAS_FILE" ] && [ "$IDEAS_FILE" = "mem0" ]; then
+            # Use Mem0 pending ideas
+            echo "Reading pending ideas from Mem0"
+            IDEAS=$(ideation-claude pending --limit 100 2>&1 | grep -E "^\s+[0-9]+\." | sed 's/^[[:space:]]*[0-9]*\. //' || echo "")
+            if [ -n "$IDEAS" ]; then
+              IDEA_COUNT=$(echo "$IDEAS" | wc -l)
+              echo "Total pending ideas: $IDEA_COUNT"
+              echo "$IDEAS" | while IFS= read -r idea; do
+                [ -z "$idea" ] && continue
+                echo "Evaluating: $idea"
+                OUTPUT_FILE="reports/$(echo "$idea" | tr ' ' '_' | tr -cd '[:alnum:]_').md"
+                if [ "${{ github.event.inputs.subagent }}" = "true" ]; then
+                  ideation-claude $QUIET_FLAG --subagent --threshold ${{ github.event.inputs.threshold }} "$idea" > "$OUTPUT_FILE" 2>&1 || true
+                else
+                  ideation-claude $QUIET_FLAG --threshold ${{ github.event.inputs.threshold }} "$idea" > "$OUTPUT_FILE" 2>&1 || true
+                fi
+              done
+            else
+              echo "No pending ideas found in Mem0"
+            fi
+          elif [ -n "$IDEAS_FILE" ] && [ -f "$IDEAS_FILE" ]; then
             # Use specified ideas file
             echo "Reading ideas from: $IDEAS_FILE"
             while IFS= read -r idea; do
