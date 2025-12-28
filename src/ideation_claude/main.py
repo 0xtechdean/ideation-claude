@@ -390,7 +390,63 @@ def insights(query, limit):
 
 def main():
     """Entry point for the CLI."""
-    cli()
+    try:
+        cli()
+    except click.exceptions.UsageError as e:
+        # Click tried to match an argument as a command but failed
+        # Check if it's a "No such command" error - if so, treat as topic
+        if "No such command" in str(e) or "No such option" in str(e):
+            # Re-parse as evaluation with topics
+            known_commands = {'add', 'pending', 'search', 'list', 'similar', 'insights'}
+            topics = []
+            skip_next = False
+            for arg in sys.argv[1:]:
+                if skip_next:
+                    skip_next = False
+                    continue
+                if arg.startswith('-'):
+                    if arg in ['-t', '--threshold', '-o', '--output', '-l', '--limit']:
+                        skip_next = True
+                    continue
+                if arg in known_commands:
+                    # It's actually a command, re-raise
+                    raise
+                topics.append(arg)
+            
+            if topics:
+                # Treat as evaluation
+                threshold = 5.0
+                output = None
+                quiet = False
+                subagent = False
+                metrics = False
+                
+                # Parse options from sys.argv
+                i = 0
+                while i < len(sys.argv) - 1:
+                    arg = sys.argv[i + 1]
+                    if arg == '--threshold' or arg == '-t':
+                        if i + 2 < len(sys.argv):
+                            threshold = float(sys.argv[i + 2])
+                            i += 2
+                            continue
+                    elif arg == '--output' or arg == '-o':
+                        if i + 2 < len(sys.argv):
+                            output = sys.argv[i + 2]
+                            i += 2
+                            continue
+                    elif arg == '--quiet' or arg == '-q':
+                        quiet = True
+                    elif arg == '--subagent' or arg == '-s':
+                        subagent = True
+                    elif arg == '--metrics' or arg == '-m':
+                        metrics = True
+                    i += 1
+                
+                asyncio.run(run_evaluation(topics, threshold, output, not quiet, subagent, metrics))
+                return
+        # Re-raise if we can't handle it
+        raise
 
 
 if __name__ == "__main__":
