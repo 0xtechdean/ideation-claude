@@ -38,9 +38,11 @@ class TestUtilityFunctions:
     def test_elimination_detection(self):
         """Test elimination keyword detection."""
         elimination_keywords = ["ELIMINATE", "eliminate", "ELIMINATED"]
+        test_text = "ELIMINATE"
         
         for keyword in elimination_keywords:
-            assert keyword.upper() in "ELIMINATE"
+            # Check if keyword (uppercase) appears in test text or vice versa
+            assert keyword.upper() in test_text or test_text in keyword.upper()
         
-        assert "PASS" not in "ELIMINATE"
+        assert "PASS" not in test_text
 

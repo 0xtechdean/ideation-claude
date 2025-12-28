@@ -79,9 +79,13 @@ class TestIdeaMemory:
 
     def test_check_if_similar_eliminated_found(self, mock_env_vars, mock_memory):
         """Test checking for similar eliminated ideas when found."""
-        # Mock a result
+        # Mock a result with eliminated=True in metadata
         mock_memory.search.return_value = {
-            "results": [{"id": "1", "content": "Similar idea"}]
+            "results": [{
+                "id": "1", 
+                "content": "Similar idea",
+                "metadata": {"eliminated": True, "topic": "Similar idea"}
+            }]
         }
         
         memory = IdeaMemory()

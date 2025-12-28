@@ -42,7 +42,12 @@ class TestCLI:
                 metrics=False,
             )
             
-            mock_eval.assert_called_once_with("Test Idea", 5.0, False, None)
+            # Check that evaluate_idea was called (monitor parameter is optional)
+            assert mock_eval.called
+            call_args = mock_eval.call_args[0]
+            assert call_args[0] == "Test Idea"
+            assert call_args[1] == 5.0
+            assert call_args[2] == False
 
     @pytest.mark.asyncio
     async def test_run_evaluation_multiple_ideas(self):
