@@ -14,7 +14,13 @@ from .orchestrator import evaluate_idea, evaluate_ideas
 from .orchestrator_subagent import evaluate_with_subagents
 
 
-@click.group(invoke_without_command=True, context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
+@click.group()
+def cli():
+    """Ideation-Claude: Multi-agent startup idea validator."""
+    pass
+
+
+@cli.command(context_settings={"ignore_unknown_options": True, "allow_extra_args": True})
 @click.option(
     "--threshold",
     "-t",
@@ -52,9 +58,10 @@ from .orchestrator_subagent import evaluate_with_subagents
     is_flag=True,
     help="Save detailed metrics to JSON file",
 )
+@click.argument("topics", nargs=-1)
 @click.pass_context
-def cli(ctx, threshold, output, interactive, quiet, subagent, metrics):
-    """Ideation-Claude: Multi-agent startup idea validator.
+def evaluate(ctx, threshold, output, interactive, quiet, subagent, metrics, topics):
+    """Evaluate startup ideas using Claude CLI agents.
 
     Evaluate startup ideas using Claude CLI agents that perform:
     - Market research and trend analysis
@@ -69,26 +76,37 @@ def cli(ctx, threshold, output, interactive, quiet, subagent, metrics):
     Examples:
 
         # Evaluate a single idea
-        ideation-claude "AI-powered legal research assistant"
+        ideation-claude evaluate "AI-powered legal research assistant"
 
         # Evaluate multiple ideas
-        ideation-claude "Legal AI" "Sustainable packaging"
+        ideation-claude evaluate "Legal AI" "Sustainable packaging"
 
         # With custom threshold
-        ideation-claude --threshold 6.0 "Your idea"
+        ideation-claude evaluate --threshold 6.0 "Your idea"
 
         # Interactive mode
-        ideation-claude --interactive
+        ideation-claude evaluate --interactive
     """
-    # Get topics from extra args if provided
-    topics = ctx.args if ctx.args else []
-    
     if interactive:
         asyncio.run(interactive_mode(threshold, quiet, subagent))
     elif topics:
         asyncio.run(run_evaluation(list(topics), threshold, output, not quiet, subagent, metrics))
-    elif ctx.invoked_subcommand is None:
-        click.echo(ctx.get_help())
+    else:
+        click.echo("Error: No topics provided. Use 'ideation-claude evaluate \"Your idea\"' or 'ideation-claude evaluate --interactive'")
+        ctx.exit(1)
+
+
+# Make evaluate the default command
+cli.add_command(evaluate)
+# Set evaluate as default when no command is provided
+@cli.command(name="", hidden=True)
+@click.pass_context
+def default(ctx):
+    """Default command - redirects to evaluate."""
+    # Get all args and pass to evaluate
+    import sys
+    sys.argv = ['ideation-claude', 'evaluate'] + sys.argv[1:]
+    evaluate.callback(ctx)
 
 
 async def run_evaluation(
