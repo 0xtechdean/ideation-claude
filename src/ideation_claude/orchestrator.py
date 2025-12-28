@@ -8,6 +8,8 @@ from typing import Optional
 
 from claude_code_sdk import query, ClaudeCodeOptions
 
+from .memory import get_memory
+
 
 @dataclass
 class IdeaResult:
@@ -49,15 +51,17 @@ class IdeationOrchestrator:
     passed between phases for continuity.
     """
 
-    def __init__(self, topic: str, threshold: float = 5.0):
+    def __init__(self, topic: str, threshold: float = 5.0, use_memory: bool = True):
         """Initialize the orchestrator.
 
         Args:
             topic: The startup idea/topic to evaluate
             threshold: Elimination threshold (default 5.0)
+            use_memory: Whether to use Mem0 for storing and retrieving context
         """
         self.state = PipelineState(topic=topic, threshold=threshold)
         self.agents_dir = Path(__file__).parent / "agents"
+        self.memory = get_memory() if use_memory else None
 
     def _get_agent_prompt(self, agent_name: str) -> str:
         """Load the system prompt for an agent."""
@@ -158,17 +162,35 @@ class IdeationOrchestrator:
             if verbose and not monitor:
                 print(f"  {msg}")
 
+        # Check for similar ideas before starting
+        similar_context = ""
+        if self.memory:
+            similar = self.memory.check_if_similar_eliminated(topic)
+            if similar:
+                log(f"⚠ Found similar eliminated idea: {similar.get('metadata', {}).get('topic', 'Unknown')}")
+            similar_context = self.memory.get_similar_ideas_context(topic)
+            if similar_context:
+                log("📚 Using context from similar past evaluations")
+
         # Phase 1: Research (must run first - baseline for all others)
         if monitor:
             monitor.start_phase(Phase.RESEARCH, "Researching market trends and pain points")
         else:
             log("[1/6] Researching market trends and pain points...")
         
+        research_prompt = f"Research market trends and customer pain points for: {topic}"
+        if similar_context:
+            research_prompt += f"\n\n{similar_context}"
+        
         results.research_insights = await self._run_agent(
             "researcher",
-            f"Research market trends and customer pain points for: {topic}",
+            research_prompt,
             allowed_tools=["WebSearch"],
         )
+        
+        # Store research insights in memory
+        if self.memory:
+            self.memory.save_phase_output(topic, "research", results.research_insights)
         
         if monitor:
             monitor.complete_phase(Phase.RESEARCH, api_calls=1)
@@ -200,6 +222,12 @@ class IdeationOrchestrator:
             results.competitor_analysis = competitor_result
             results.market_sizing = market_result
             results.resource_findings = resource_result
+            
+            # Store phase outputs in memory
+            if self.memory:
+                self.memory.save_phase_output(topic, "competitor_analysis", competitor_result)
+                self.memory.save_phase_output(topic, "market_sizing", market_result)
+                self.memory.save_phase_output(topic, "resource_findings", resource_result)
         else:
             # Sequential fallback
             log("[2/6] Analyzing competitive landscape...")
@@ -222,6 +250,12 @@ class IdeationOrchestrator:
                 f"Find resources and assess technical feasibility for: {topic}\n\nResearch context:\n{results.research_insights[:2000]}",
                 allowed_tools=["WebSearch"],
             )
+            
+            # Store phase outputs in memory
+            if self.memory:
+                self.memory.save_phase_output(topic, "competitor_analysis", results.competitor_analysis)
+                self.memory.save_phase_output(topic, "market_sizing", results.market_sizing)
+                self.memory.save_phase_output(topic, "resource_findings", results.resource_findings)
 
         # Build context summary for subsequent phases
         context_summary = f"""
@@ -344,6 +378,24 @@ Customer Discovery Plan:
 
         results.decision = "ELIMINATED" if results.eliminated else "PASSED"
 
+        # Save complete idea evaluation to memory
+        if self.memory:
+            self.memory.save_idea(
+                topic=topic,
+                eliminated=results.eliminated,
+                score=results.total_score,
+                threshold=self.state.threshold,
+                reason=results.scores if results.eliminated else "",
+                research_insights=results.research_insights,
+                competitor_analysis=results.competitor_analysis,
+                market_sizing=results.market_sizing,
+                resource_findings=results.resource_findings,
+                hypothesis=results.hypothesis,
+                customer_discovery=results.customer_discovery,
+                pivot_suggestions=results.pivot_suggestions if results.eliminated else "",
+            )
+            log(f"💾 Saved evaluation to memory (status: {results.decision})")
+
         return results
 
 
@@ -352,6 +404,7 @@ async def evaluate_idea(
     threshold: float = 5.0,
     verbose: bool = True,
     monitor=None,
+    use_memory: bool = True,
 ) -> IdeaResult:
     """Convenience function to evaluate a single idea.
 
@@ -359,11 +412,13 @@ async def evaluate_idea(
         topic: The startup idea to evaluate
         threshold: Elimination threshold (default 5.0)
         verbose: Whether to print progress
+        monitor: Optional PipelineMonitor instance
+        use_memory: Whether to use Mem0 for storing and retrieving context
 
     Returns:
         IdeaResult with complete evaluation
     """
-    orchestrator = IdeationOrchestrator(topic=topic, threshold=threshold)
+    orchestrator = IdeationOrchestrator(topic=topic, threshold=threshold, use_memory=use_memory)
     return await orchestrator.run_pipeline(verbose=verbose, monitor=monitor)
 
 

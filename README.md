@@ -12,7 +12,7 @@ Unlike traditional agent frameworks (CrewAI, LangChain), this project runs each 
 - **Mom Test Framework**: Customer discovery interview planning
 - **8-Criteria Scoring**: Objective evaluation with go/no-go decisions
 - **Pivot Suggestions**: Strategic alternatives for eliminated ideas
-- **Memory Integration**: Track previously eliminated ideas with Mem0
+- **Memory Integration**: Comprehensive Mem0 integration for storing all ideas, phase outputs, and building a knowledge base
 
 ## Pipeline (Optimized with Parallel Execution)
 
@@ -199,6 +199,75 @@ Each agent is a Claude CLI invocation with:
 - Context passed explicitly between phases
 
 The orchestrator manages the pipeline using `asyncio.gather()` to run independent agents in parallel.
+
+## Memory Integration (Mem0)
+
+The project uses Mem0 to build a comprehensive knowledge base of evaluated ideas and market intelligence. This enables:
+
+### What Gets Stored
+
+1. **All Evaluated Ideas** (both passed and eliminated)
+   - Topic, status, score, threshold
+   - Complete evaluation results
+   - Timestamp and metadata
+
+2. **Phase Outputs** (stored separately for knowledge building)
+   - Research insights
+   - Competitor analysis
+   - Market sizing data
+   - Resource findings
+   - Hypothesis and MVP definitions
+   - Customer discovery plans
+
+3. **Market Intelligence**
+   - Searchable insights across all evaluations
+   - Patterns and trends
+   - Similar idea detection
+
+### How It Works
+
+- **Automatic Storage**: All evaluations are automatically saved to memory
+- **Context Retrieval**: Agents receive context about similar past evaluations
+- **Knowledge Building**: Phase outputs build a searchable knowledge base
+- **Similar Idea Detection**: Warns if a similar idea was previously eliminated
+
+### Memory Modes
+
+**Cloud Mode** (with `MEM0_API_KEY`):
+- Uses Mem0's managed service
+- Persistent across machines
+- Better for teams
+
+**Local Mode** (without `MEM0_API_KEY`):
+- Uses local Qdrant vector store
+- Stored in `.mem0_data/` directory
+- Requires `OPENAI_API_KEY` for embeddings
+
+### CLI Commands
+
+```bash
+# Search for similar ideas
+ideation-claude search "AI assistant"
+
+# List all evaluated ideas
+ideation-claude list
+
+# List only passed ideas
+ideation-claude list --status passed
+
+# Check if similar idea was eliminated
+ideation-claude similar "Your idea"
+
+# Get market insights
+ideation-claude insights "market trends"
+```
+
+### Benefits
+
+- **Avoid Duplicate Work**: Detect similar ideas before evaluation
+- **Learn from Past**: Agents use context from similar evaluations
+- **Build Knowledge Base**: Accumulate market intelligence over time
+- **Pattern Recognition**: Identify trends across evaluations
 
 ## Orchestration Modes
 

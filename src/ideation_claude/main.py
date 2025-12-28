@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 # Load environment variables from .env file if it exists
 load_dotenv()
 
+from .memory import get_memory
 from .orchestrator import evaluate_idea, evaluate_ideas
 from .orchestrator_subagent import evaluate_with_subagents
 
@@ -238,6 +239,93 @@ async def interactive_mode(threshold: float, quiet: bool, subagent: bool = False
             # Treat as an idea to add
             topics.append(command)
             click.echo(f"Added: {command}")
+
+
+@cli.command()
+@click.argument("query")
+@click.option("--limit", "-l", default=5, help="Maximum number of results")
+def search(query, limit):
+    """Search memory for similar ideas and insights."""
+    memory = get_memory()
+    results = memory.search_similar_ideas(query, limit=limit)
+    
+    if not results:
+        click.echo(f"No similar ideas found for: {query}")
+        return
+    
+    click.echo(f"\nFound {len(results)} similar ideas:\n")
+    for i, result in enumerate(results, 1):
+        meta = result.get("metadata", {})
+        topic = meta.get("topic", "Unknown")
+        status = meta.get("status", "unknown").upper()
+        score = meta.get("score", 0.0)
+        click.echo(f"{i}. {topic}")
+        click.echo(f"   Status: {status}, Score: {score}/10")
+        click.echo()
+
+
+@cli.command()
+@click.option("--status", "-s", type=click.Choice(["passed", "eliminated", "all"]), default="all", help="Filter by status")
+@click.option("--limit", "-l", default=20, help="Maximum number of ideas to show")
+def list(status, limit):
+    """List all evaluated ideas from memory."""
+    memory = get_memory()
+    status_filter = None if status == "all" else status
+    ideas = memory.get_all_ideas(status=status_filter, limit=limit)
+    
+    if not ideas:
+        click.echo("No ideas found in memory.")
+        return
+    
+    click.echo(f"\nFound {len(ideas)} ideas:\n")
+    for i, idea in enumerate(ideas, 1):
+        meta = idea.get("metadata", {})
+        topic = meta.get("topic", "Unknown")
+        idea_status = meta.get("status", "unknown").upper()
+        score = meta.get("score", 0.0)
+        timestamp = meta.get("timestamp", "Unknown")
+        click.echo(f"{i}. {topic}")
+        click.echo(f"   Status: {idea_status}, Score: {score}/10")
+        click.echo(f"   Date: {timestamp}")
+        click.echo()
+
+
+@cli.command()
+@click.argument("topic")
+def similar(topic):
+    """Check if a similar idea was previously evaluated."""
+    memory = get_memory()
+    similar_idea = memory.check_if_similar_eliminated(topic)
+    
+    if similar_idea:
+        meta = similar_idea.get("metadata", {})
+        click.echo(f"\n⚠ Found similar idea: {meta.get('topic', 'Unknown')}")
+        click.echo(f"   Status: {meta.get('status', 'unknown').upper()}")
+        click.echo(f"   Score: {meta.get('score', 0.0)}/10")
+        click.echo(f"   Date: {meta.get('timestamp', 'Unknown')}")
+    else:
+        click.echo(f"\n✓ No similar eliminated ideas found for: {topic}")
+
+
+@cli.command()
+@click.argument("query")
+@click.option("--limit", "-l", default=5, help="Maximum number of insights")
+def insights(query, limit):
+    """Get market insights from past evaluations."""
+    memory = get_memory()
+    insights_list = memory.get_market_insights(query, limit=limit)
+    
+    if not insights_list:
+        click.echo(f"No insights found for: {query}")
+        return
+    
+    click.echo(f"\nFound {len(insights_list)} market insights:\n")
+    for i, insight in enumerate(insights_list, 1):
+        meta = insight.get("metadata", {})
+        phase = meta.get("phase", "unknown")
+        topic = meta.get("topic", "Unknown")
+        click.echo(f"{i}. [{phase.upper()}] {topic}")
+        click.echo()
 
 
 def main():
