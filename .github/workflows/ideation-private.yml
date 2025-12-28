@@ -92,10 +92,11 @@ jobs:
             while IFS= read -r idea; do
               [ -z "$idea" ] && continue
               echo "Evaluating: $idea"
+              OUTPUT_FILE="reports/$(echo "$idea" | tr ' ' '_' | tr -cd '[:alnum:]_').md"
               if [ "${{ github.event.inputs.subagent }}" = "true" ]; then
-                ideation-claude $QUIET_FLAG --subagent --threshold ${{ github.event.inputs.threshold }} -o "reports/$(echo "$idea" | tr ' ' '_' | tr -cd '[:alnum:]_').md" "$idea"
+                ideation-claude $QUIET_FLAG --subagent --threshold ${{ github.event.inputs.threshold }} --output "$OUTPUT_FILE" "$idea"
               else
-                ideation-claude $QUIET_FLAG --threshold ${{ github.event.inputs.threshold }} -o "reports/$(echo "$idea" | tr ' ' '_' | tr -cd '[:alnum:]_').md" "$idea"
+                ideation-claude $QUIET_FLAG --threshold ${{ github.event.inputs.threshold }} --output "$OUTPUT_FILE" "$idea"
               fi
             done < "$IDEAS_FILE"
           else
@@ -106,10 +107,11 @@ jobs:
               idea=$(echo "$idea" | xargs)  # Trim whitespace
               [ -z "$idea" ] && continue
               echo "Evaluating: $idea"
+              OUTPUT_FILE="reports/$(echo "$idea" | tr ' ' '_' | tr -cd '[:alnum:]_').md"
               if [ "${{ github.event.inputs.subagent }}" = "true" ]; then
-                ideation-claude $QUIET_FLAG --subagent --threshold ${{ github.event.inputs.threshold }} -o "reports/$(echo "$idea" | tr ' ' '_' | tr -cd '[:alnum:]_').md" "$idea"
+                ideation-claude $QUIET_FLAG --subagent --threshold ${{ github.event.inputs.threshold }} --output "$OUTPUT_FILE" "$idea"
               else
-                ideation-claude $QUIET_FLAG --threshold ${{ github.event.inputs.threshold }} -o "reports/$(echo "$idea" | tr ' ' '_' | tr -cd '[:alnum:]_').md" "$idea"
+                ideation-claude $QUIET_FLAG --threshold ${{ github.event.inputs.threshold }} --output "$OUTPUT_FILE" "$idea"
               fi
             done
           fi
