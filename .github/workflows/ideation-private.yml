@@ -93,9 +93,9 @@ jobs:
               [ -z "$idea" ] && continue
               echo "Evaluating: $idea"
               if [ "${{ github.event.inputs.subagent }}" = "true" ]; then
-                ideation-claude $QUIET_FLAG --subagent --threshold ${{ github.event.inputs.threshold }} "$idea" --output "reports/$(echo "$idea" | tr ' ' '_' | tr -cd '[:alnum:]_').md"
+                ideation-claude $QUIET_FLAG --subagent --threshold ${{ github.event.inputs.threshold }} "$idea" -o "reports/$(echo "$idea" | tr ' ' '_' | tr -cd '[:alnum:]_').md"
               else
-                ideation-claude $QUIET_FLAG --threshold ${{ github.event.inputs.threshold }} "$idea" --output "reports/$(echo "$idea" | tr ' ' '_' | tr -cd '[:alnum:]_').md"
+                ideation-claude $QUIET_FLAG --threshold ${{ github.event.inputs.threshold }} "$idea" -o "reports/$(echo "$idea" | tr ' ' '_' | tr -cd '[:alnum:]_').md"
               fi
             done < "$IDEAS_FILE"
           else
@@ -107,9 +107,9 @@ jobs:
               [ -z "$idea" ] && continue
               echo "Evaluating: $idea"
               if [ "${{ github.event.inputs.subagent }}" = "true" ]; then
-                ideation-claude $QUIET_FLAG --subagent --threshold ${{ github.event.inputs.threshold }} "$idea" --output "reports/$(echo "$idea" | tr ' ' '_' | tr -cd '[:alnum:]_').md"
+                ideation-claude $QUIET_FLAG --subagent --threshold ${{ github.event.inputs.threshold }} "$idea" -o "reports/$(echo "$idea" | tr ' ' '_' | tr -cd '[:alnum:]_').md"
               else
-                ideation-claude $QUIET_FLAG --threshold ${{ github.event.inputs.threshold }} "$idea" --output "reports/$(echo "$idea" | tr ' ' '_' | tr -cd '[:alnum:]_').md"
+                ideation-claude $QUIET_FLAG --threshold ${{ github.event.inputs.threshold }} "$idea" -o "reports/$(echo "$idea" | tr ' ' '_' | tr -cd '[:alnum:]_').md"
               fi
             done
           fi
