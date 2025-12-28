@@ -82,7 +82,7 @@ jobs:
           if [ -n "$IDEAS_FILE" ] && [ "$IDEAS_FILE" = "mem0" ]; then
             # Use Mem0 pending ideas
             echo "Reading pending ideas from Mem0"
-            IDEAS=$(docker run --rm --entrypoint="" -e ANTHROPIC_API_KEY -e MEM0_API_KEY -e OPENAI_API_KEY ideation-claude:latest ideation-claude pending --limit 100 2>&1 | grep -E "^\s+[0-9]+\." | sed 's/^[[:space:]]*[0-9]*\. //' || echo "")
+            IDEAS=$(docker run --rm --entrypoint="" -e ANTHROPIC_API_KEY -e MEM0_API_KEY -e OPENAI_API_KEY ideation-claude:latest python3 -c "import sys; sys.argv = ['ideation-claude', 'pending', '--limit', '100']; from ideation_claude.main import cli; cli(standalone_mode=False)" 2>&1 | grep -E "^\s+[0-9]+\." | sed 's/^[[:space:]]*[0-9]*\. //' || echo "")
             if [ -n "$IDEAS" ]; then
               IDEA_COUNT=$(echo "$IDEAS" | wc -l)
               echo "Total pending ideas: $IDEA_COUNT"
@@ -91,9 +91,9 @@ jobs:
                 echo "Evaluating: $idea"
                 OUTPUT_FILE="reports/$(echo "$idea" | tr ' ' '_' | tr -cd '[:alnum:]_').md"
                 if [ "${{ github.event.inputs.subagent }}" = "true" ]; then
-                  docker run --rm --entrypoint="" -v "$PWD/reports:/app/reports" -e ANTHROPIC_API_KEY -e MEM0_API_KEY -e OPENAI_API_KEY ideation-claude:latest ideation-claude $QUIET_FLAG --subagent --threshold ${{ github.event.inputs.threshold }} "$idea" > "$OUTPUT_FILE" 2>&1 || true
+                  docker run --rm --entrypoint="" -v "$PWD/reports:/app/reports" -e ANTHROPIC_API_KEY -e MEM0_API_KEY -e OPENAI_API_KEY ideation-claude:latest python3 -c "import sys; sys.argv = ['ideation-claude', '--subagent', '--threshold', '${{ github.event.inputs.threshold }}', '$idea']; from ideation_claude.main import main; main()" > "$OUTPUT_FILE" 2>&1 || true
                 else
-                  docker run --rm --entrypoint="" -v "$PWD/reports:/app/reports" -e ANTHROPIC_API_KEY -e MEM0_API_KEY -e OPENAI_API_KEY ideation-claude:latest ideation-claude $QUIET_FLAG --threshold ${{ github.event.inputs.threshold }} "$idea" > "$OUTPUT_FILE" 2>&1 || true
+                  docker run --rm --entrypoint="" -v "$PWD/reports:/app/reports" -e ANTHROPIC_API_KEY -e MEM0_API_KEY -e OPENAI_API_KEY ideation-claude:latest python3 -c "import sys; sys.argv = ['ideation-claude', '--threshold', '${{ github.event.inputs.threshold }}', '$idea']; from ideation_claude.main import main; main()" > "$OUTPUT_FILE" 2>&1 || true
                 fi
               done
             else
@@ -107,9 +107,9 @@ jobs:
               echo "Evaluating: $idea"
               OUTPUT_FILE="reports/$(echo "$idea" | tr ' ' '_' | tr -cd '[:alnum:]_').md"
               if [ "${{ github.event.inputs.subagent }}" = "true" ]; then
-                docker run --rm --entrypoint="" -v "$PWD/reports:/app/reports" -v "$PWD/$IDEAS_FILE:/app/$IDEAS_FILE:ro" -e ANTHROPIC_API_KEY -e MEM0_API_KEY -e OPENAI_API_KEY ideation-claude:latest ideation-claude $QUIET_FLAG --subagent --threshold ${{ github.event.inputs.threshold }} "$idea" > "$OUTPUT_FILE" 2>&1 || true
+                docker run --rm --entrypoint="" -v "$PWD/reports:/app/reports" -v "$PWD/$IDEAS_FILE:/app/$IDEAS_FILE:ro" -e ANTHROPIC_API_KEY -e MEM0_API_KEY -e OPENAI_API_KEY ideation-claude:latest python3 -c "import sys; sys.argv = ['ideation-claude', '--subagent', '--threshold', '${{ github.event.inputs.threshold }}', '$idea']; from ideation_claude.main import main; main()" > "$OUTPUT_FILE" 2>&1 || true
               else
-                docker run --rm --entrypoint="" -v "$PWD/reports:/app/reports" -v "$PWD/$IDEAS_FILE:/app/$IDEAS_FILE:ro" -e ANTHROPIC_API_KEY -e MEM0_API_KEY -e OPENAI_API_KEY ideation-claude:latest ideation-claude $QUIET_FLAG --threshold ${{ github.event.inputs.threshold }} "$idea" > "$OUTPUT_FILE" 2>&1 || true
+                docker run --rm --entrypoint="" -v "$PWD/reports:/app/reports" -v "$PWD/$IDEAS_FILE:/app/$IDEAS_FILE:ro" -e ANTHROPIC_API_KEY -e MEM0_API_KEY -e OPENAI_API_KEY ideation-claude:latest python3 -c "import sys; sys.argv = ['ideation-claude', '--threshold', '${{ github.event.inputs.threshold }}', '$idea']; from ideation_claude.main import main; main()" > "$OUTPUT_FILE" 2>&1 || true
               fi
             done < "$IDEAS_FILE"
           else
@@ -122,9 +122,9 @@ jobs:
               echo "Evaluating: $idea"
               OUTPUT_FILE="reports/$(echo "$idea" | tr ' ' '_' | tr -cd '[:alnum:]_').md"
               if [ "${{ github.event.inputs.subagent }}" = "true" ]; then
-                docker run --rm --entrypoint="" -v "$PWD/reports:/app/reports" -e ANTHROPIC_API_KEY -e MEM0_API_KEY -e OPENAI_API_KEY ideation-claude:latest ideation-claude $QUIET_FLAG --subagent --threshold ${{ github.event.inputs.threshold }} "$idea" > "$OUTPUT_FILE" 2>&1 || true
+                docker run --rm --entrypoint="" -v "$PWD/reports:/app/reports" -e ANTHROPIC_API_KEY -e MEM0_API_KEY -e OPENAI_API_KEY ideation-claude:latest python3 -c "import sys; sys.argv = ['ideation-claude', '--subagent', '--threshold', '${{ github.event.inputs.threshold }}', '$idea']; from ideation_claude.main import main; main()" > "$OUTPUT_FILE" 2>&1 || true
               else
-                docker run --rm --entrypoint="" -v "$PWD/reports:/app/reports" -e ANTHROPIC_API_KEY -e MEM0_API_KEY -e OPENAI_API_KEY ideation-claude:latest ideation-claude $QUIET_FLAG --threshold ${{ github.event.inputs.threshold }} "$idea" > "$OUTPUT_FILE" 2>&1 || true
+                docker run --rm --entrypoint="" -v "$PWD/reports:/app/reports" -e ANTHROPIC_API_KEY -e MEM0_API_KEY -e OPENAI_API_KEY ideation-claude:latest python3 -c "import sys; sys.argv = ['ideation-claude', '--threshold', '${{ github.event.inputs.threshold }}', '$idea']; from ideation_claude.main import main; main()" > "$OUTPUT_FILE" 2>&1 || true
               fi
             done
           fi
