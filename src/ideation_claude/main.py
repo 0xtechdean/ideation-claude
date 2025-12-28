@@ -392,10 +392,11 @@ def main():
     """Entry point for the CLI."""
     try:
         cli()
-    except click.exceptions.UsageError as e:
+    except (click.exceptions.UsageError, click.exceptions.BadParameter, SystemExit) as e:
         # Click tried to match an argument as a command but failed
         # Check if it's a "No such command" error - if so, treat as topic
-        if "No such command" in str(e) or "No such option" in str(e):
+        error_msg = str(e)
+        if "No such command" in error_msg:
             # Re-parse as evaluation with topics
             known_commands = {'add', 'pending', 'search', 'list', 'similar', 'insights'}
             topics = []
@@ -446,6 +447,8 @@ def main():
                 asyncio.run(run_evaluation(topics, threshold, output, not quiet, subagent, metrics))
                 return
         # Re-raise if we can't handle it
+        if isinstance(e, SystemExit):
+            raise
         raise
 
 
