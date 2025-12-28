@@ -288,8 +288,8 @@ ideation-claude --threshold 6.0 "Your idea"
 # Save report to file
 ideation-claude --output report.md "Your idea"
 
-# Use sub-agent orchestrator mode
-ideation-claude --subagent "Your idea"
+# Problem validation only
+ideation-claude --problem-only "Your problem"
 
 # With metrics and monitoring
 ideation-claude --metrics "Your idea"
@@ -327,12 +327,12 @@ docker run --rm \
   ideation-claude:latest \
   --threshold 6.0 "Your idea"
 
-# Sub-agent mode
+# Problem validation only
 docker run --rm \
   -v "$PWD/.env:/app/.env:ro" \
   -v "$PWD/reports:/app/reports" \
   ideation-claude:latest \
-  --subagent "Your idea"
+  --problem-only "Your problem"
 
 # Problem validation only
 docker run --rm \
@@ -352,7 +352,7 @@ docker-compose run --rm ideation-claude "AI-powered legal research assistant"
 docker-compose run --rm ideation-claude "Idea 1" "Idea 2" "Idea 3"
 
 # With options
-docker-compose run --rm ideation-claude --threshold 6.0 --subagent "Your idea"
+docker-compose run --rm ideation-claude --threshold 6.0 --problem-only "Your problem"
 
 # Interactive mode
 docker-compose run --rm ideation-claude --interactive
@@ -488,31 +488,11 @@ ideation-claude insights "market trends"
 - **Quick Insights**: Phase summaries provide fast access to key findings
 - **Searchable Summaries**: Find relevant insights quickly using phase summaries
 
-## Orchestration Modes
+## Orchestration
 
-The project supports two orchestration modes:
+The project uses a **Sub-Agent Orchestrator** that leverages Claude's native sub-agent capabilities.
 
-### 1. Direct SDK Mode (default)
-
-Each agent runs as a separate Claude CLI instance with explicit context passing between phases.
-
-```bash
-ideation-claude "Your idea"
-```
-
-**Characteristics:**
-- Python spawns separate Claude instances for each agent
-- Context passed explicitly between phases
-- More control over each agent's behavior
-- Parallel execution via `asyncio.gather()`
-
-### 2. Sub-Agent Mode
-
-A single Claude coordinator instance uses the Task tool to spawn specialized sub-agents.
-
-```bash
-ideation-claude --subagent "Your idea"
-```
+A single Claude coordinator instance uses the Task tool to spawn specialized sub-agents for each phase of the evaluation pipeline.
 
 **Characteristics:**
 - Single coordinator orchestrates the entire pipeline
@@ -520,13 +500,7 @@ ideation-claude --subagent "Your idea"
 - More native to Claude Code architecture
 - Sub-agents can spawn their own sub-agents (nested)
 - Better for complex multi-step research
-
-| Aspect | Direct SDK | Sub-Agent |
-|--------|-----------|-----------|
-| Instances | Multiple Claude instances | Single coordinator |
-| Context | Explicit passing | Automatic inheritance |
-| Control | Fine-grained | Delegated to coordinator |
-| Nesting | Manual | Native support |
+- Supports problem-first validation with early elimination
 
 ### Agent Details
 
