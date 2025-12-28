@@ -17,8 +17,8 @@ from .orchestrator_subagent import evaluate_with_subagents
 
 class CustomGroup(click.Group):
     """Custom group that handles extra arguments as topics."""
-    def parse_args(self, ctx, args):
-        # Parse known options first
+    def make_context(self, info_name, args, **extra):
+        # Separate options from topics
         remaining = []
         topics = []
         i = 0
@@ -27,19 +27,21 @@ class CustomGroup(click.Group):
             # Check if it's an option
             if arg.startswith('-'):
                 remaining.append(arg)
-                # If it's an option that takes a value, skip the next arg
-                if arg in ['-t', '--threshold', '-o', '--output']:
+                # If it's an option that takes a value, include the next arg
+                if arg in ['-t', '--threshold', '-o', '--output'] and i + 1 < len(args):
                     i += 1
-                    if i < len(args):
-                        remaining.append(args[i])
+                    remaining.append(args[i])
             else:
-                # It's a topic argument
-                topics.append(arg)
+                # It's a topic argument - only add if not a known command
+                if arg not in ['add', 'pending', 'search', 'list', 'similar', 'insights']:
+                    topics.append(arg)
+                else:
+                    remaining.append(arg)
             i += 1
         
-        # Store topics in context
-        ctx.params['_topics'] = topics
-        return super().parse_args(ctx, remaining)
+        # Store topics in extra for context
+        extra['_topics'] = topics
+        return super().make_context(info_name, remaining, **extra)
 
 
 @click.group(cls=CustomGroup, invoke_without_command=True)
