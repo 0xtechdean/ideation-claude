@@ -141,13 +141,13 @@ The evaluation is split into two distinct phases, with a focus on problem valida
 **Final Decision**:
 - Combined score: 60% problem + 40% solution (weighted)
 - Early elimination if problem validation fails
-- Pivot suggestions for eliminated ideas
+- Pivot suggestions for eliminated problems
 
 **Memory Service (Mem0)**
-- Stores all evaluated ideas and their outcomes
+- Stores all evaluated problems and their outcomes
 - Maintains phase-level outputs for context
-- Provides market insights and similar idea detection
-- Supports pending ideas queue for batch processing
+- Provides market insights and similar problem detection
+- Supports pending problems queue for batch processing
 
 **Monitoring System**
 - Real-time progress tracking with `rich` library
@@ -157,7 +157,7 @@ The evaluation is split into two distinct phases, with a focus on problem valida
 
 ### Data Flow
 
-1. **Input**: User provides idea(s) via CLI or GitHub Actions
+1. **Input**: User provides problem(s) via CLI or GitHub Actions
 2. **Orchestration**: Orchestrator initializes pipeline state
 3. **Problem Validation Phase**:
    - Market research and pain point analysis
@@ -174,7 +174,7 @@ The evaluation is split into two distinct phases, with a focus on problem valida
 7. **Agent Execution**: Claude Code CLI agents perform analysis
 8. **Memory Storage**: Phase outputs saved to Mem0
 9. **Final Scoring**: Combined score (60% problem + 40% solution)
-10. **Decision**: Idea passes (combined score ≥ threshold) or is eliminated
+10. **Decision**: Problem passes (combined score ≥ threshold) or is eliminated
 11. **Output**: Report generated with full analysis and recommendations
 
 ## Features
@@ -188,8 +188,8 @@ The evaluation is split into two distinct phases, with a focus on problem valida
 - **Lean Startup Methodology**: Hypothesis extraction and MVP definition
 - **Mom Test Framework**: Customer discovery interview planning
 - **16-Criteria Scoring**: 8 problem-focused + 8 solution-focused criteria
-- **Pivot Suggestions**: Strategic alternatives for eliminated ideas
-- **Memory Integration**: Comprehensive Mem0 integration for storing all ideas, phase outputs, and building a knowledge base
+- **Pivot Suggestions**: Strategic alternatives for eliminated problems
+- **Memory Integration**: Comprehensive Mem0 integration for storing all problems, phase outputs, and building a knowledge base
 
 ## Pipeline (Problem-First Validation with Early Elimination)
 
@@ -283,22 +283,22 @@ ideation-claude "Finding sustainable packaging is difficult" "Personal finance m
 ideation-claude --interactive
 
 # With custom threshold (default: 5.0)
-ideation-claude --threshold 6.0 "Your idea"
+ideation-claude --threshold 6.0 "Your problem"
 
 # Save report to file
-ideation-claude --output report.md "Your idea"
+ideation-claude --output report.md "Your problem"
 
 # Problem validation only
 ideation-claude --problem-only "Your problem"
 
 # With metrics and monitoring
-ideation-claude --metrics "Your idea"
+ideation-claude --metrics "Your problem"
 
 # Problem validation only (focus on validating the problem)
-ideation-claude --problem-only "Your idea"
+ideation-claude --problem-only "Your problem"
 
 # Full validation (problem + solution, default)
-ideation-claude "Your idea"
+ideation-claude "Your problem"
 ```
 
 ### Docker Usage
@@ -306,26 +306,26 @@ ideation-claude "Your idea"
 **Using Docker directly:**
 
 ```bash
-# Single idea evaluation
+# Single problem evaluation
 docker run --rm \
   -v "$PWD/.env:/app/.env:ro" \
   -v "$PWD/reports:/app/reports" \
   ideation-claude:latest \
-  "AI-powered legal research assistant"
+  "Legal research is too time-consuming and expensive"
 
-# Multiple ideas
+# Multiple problems
 docker run --rm \
   -v "$PWD/.env:/app/.env:ro" \
   -v "$PWD/reports:/app/reports" \
   ideation-claude:latest \
-  "Idea 1" "Idea 2" "Idea 3"
+  "Problem 1" "Problem 2" "Problem 3"
 
 # With custom threshold
 docker run --rm \
   -v "$PWD/.env:/app/.env:ro" \
   -v "$PWD/reports:/app/reports" \
   ideation-claude:latest \
-  --threshold 6.0 "Your idea"
+  --threshold 6.0 "Your problem"
 
 # Problem validation only
 docker run --rm \
@@ -333,23 +333,16 @@ docker run --rm \
   -v "$PWD/reports:/app/reports" \
   ideation-claude:latest \
   --problem-only "Your problem"
-
-# Problem validation only
-docker run --rm \
-  -v "$PWD/.env:/app/.env:ro" \
-  -v "$PWD/reports:/app/reports" \
-  ideation-claude:latest \
-  --problem-only "Your idea"
 ```
 
 **Using docker-compose (recommended):**
 
 ```bash
-# Evaluate a single idea
-docker-compose run --rm ideation-claude "AI-powered legal research assistant"
+# Evaluate a single problem
+docker-compose run --rm ideation-claude "Legal research is too time-consuming and expensive"
 
-# Evaluate multiple ideas
-docker-compose run --rm ideation-claude "Idea 1" "Idea 2" "Idea 3"
+# Evaluate multiple problems
+docker-compose run --rm ideation-claude "Problem 1" "Problem 2" "Problem 3"
 
 # With options
 docker-compose run --rm ideation-claude --threshold 6.0 --problem-only "Your problem"
@@ -409,7 +402,7 @@ The orchestrator manages the pipeline using `asyncio.gather()` to run independen
 
 ## Memory Integration (Mem0)
 
-The project uses Mem0 to build a comprehensive knowledge base of evaluated ideas and market intelligence. This enables:
+The project uses Mem0 to build a comprehensive knowledge base of evaluated problems and market intelligence. This enables:
 
 ### What Gets Stored
 
@@ -463,17 +456,17 @@ The project uses Mem0 to build a comprehensive knowledge base of evaluated ideas
 ### CLI Commands
 
 ```bash
-# Search for similar ideas
+# Search for similar problems
 ideation-claude search "AI assistant"
 
-# List all evaluated ideas
+# List all evaluated problems
 ideation-claude list
 
-# List only passed ideas
+# List only passed problems
 ideation-claude list --status passed
 
-# Check if similar idea was eliminated
-ideation-claude similar "Your idea"
+# Check if similar problem was eliminated
+ideation-claude similar "Your problem"
 
 # Get market insights
 ideation-claude insights "market trends"
@@ -549,7 +542,7 @@ ideation-claude/
 │   │   ├── ideation.yml         # Standard GitHub Actions workflow
 │   │   ├── ideation-docker.yml  # Docker-based GitHub Actions workflow
 │   │   └── ideation-private.yml # Privacy-focused workflow
-│   ├── ideas.txt.example        # Example ideas file
+│   ├── ideas.txt.example        # Example problems file
 │   └── PRIVACY.md               # Privacy guide
 ├── Dockerfile                    # Docker image definition
 ├── docker-compose.yml            # Docker Compose configuration
@@ -583,8 +576,8 @@ This project includes GitHub Actions workflows that allow you to run evaluations
 
    | Parameter | Description | Required | Default |
    |-----------|-------------|----------|---------|
-   | `idea` | Startup idea(s) to evaluate. Can be a single idea or comma-separated list | Yes | - |
-   | `ideas_file` | Path to ideas file (e.g., `.github/ideas.txt`). Overrides `idea` if provided | No | - |
+   | `idea` | Problem statement(s) to evaluate. Can be a single problem or comma-separated list | Yes | - |
+   | `ideas_file` | Path to problems file (e.g., `.github/ideas.txt`). Overrides `idea` if provided | No | - |
    | `threshold` | Elimination threshold (1-10) | No | `5.0` |
    | `problem_only` | Only run problem validation phase | No | `false` |
    | `quiet` | Suppress progress output | No | `false` |
@@ -592,27 +585,27 @@ This project includes GitHub Actions workflows that allow you to run evaluations
    | `artifact_retention_days` | Days to retain artifacts (0 = forever) | No | `30` |
 
 4. **Batch Evaluation:**
-   - Create `.github/ideas.txt` with one idea per line
-   - The workflow will evaluate all ideas and generate reports
+   - Create `.github/ideas.txt` with one problem per line
+   - The workflow will evaluate all problems and generate reports
    - Reports are saved as artifacts and can be downloaded
 
 ### Example Workflow Usage
 
-**Single idea:**
+**Single problem:**
 ```bash
-# Via GitHub UI: Enter idea in the input field
+# Via GitHub UI: Enter problem in the input field
 # Via GitHub CLI:
-gh workflow run ideation.yml -f idea="AI-powered legal research assistant" -f threshold=6.0
+gh workflow run ideation.yml -f idea="Legal research is too time-consuming and expensive" -f threshold=6.0
 ```
 
-**Multiple ideas (comma-separated):**
+**Multiple problems (comma-separated):**
 ```bash
 gh workflow run ideation.yml \
-  -f idea="AI legal assistant,Sustainable packaging,Personal finance AI" \
+  -f idea="Legal research is too expensive,Finding sustainable packaging is difficult,Personal finance management is confusing" \
   -f threshold=5.5 \
 ```
 
-**Using ideas file:**
+**Using problems file:**
 ```bash
 gh workflow run ideation.yml \
   -f ideas_file=".github/ideas.txt" \
@@ -623,7 +616,7 @@ gh workflow run ideation.yml \
 **Problem validation only:**
 ```bash
 gh workflow run ideation.yml \
-  -f idea="Your idea" \
+  -f idea="Your problem" \
   -f problem_only=true \
   -f threshold=5.0
 ```
@@ -631,7 +624,7 @@ gh workflow run ideation.yml \
 **With custom Python version:**
 ```bash
 gh workflow run ideation.yml \
-  -f idea="Your idea" \
+  -f idea="Your problem" \
   -f python_version=3.12 \
   -f artifact_retention_days=7
 ```
@@ -639,7 +632,7 @@ gh workflow run ideation.yml \
 **Using Docker workflow:**
 ```bash
 gh workflow run ideation-docker.yml \
-  -f idea="Your idea" \
+  -f idea="Your problem" \
   -f threshold=6.0 \
 ```
 
@@ -663,13 +656,13 @@ gh workflow run ideation-docker.yml \
 
 ⚠️ **Important**: In public repositories, GitHub Actions workflow runs are **visible to everyone** by default. This means:
 
-- Your startup ideas (workflow inputs) are visible in the Actions tab
+- Your problem statements (workflow inputs) are visible in the Actions tab
 - Evaluation results and logs are publicly accessible
 - Artifacts may be visible (depending on settings)
 
 **Solutions:**
 
-1. **Use Private Workflow** (Recommended for sensitive ideas):
+1. **Use Private Workflow** (Recommended for sensitive problems):
    - Use `.github/workflows/ideation-private.yml` instead
    - Only supports manual triggers (no scheduled/push triggers)
    - Artifacts auto-delete after 1 day
@@ -683,7 +676,7 @@ gh workflow run ideation-docker.yml \
 3. **Run Locally**:
    - Use the CLI directly on your machine
    - No workflow runs = no public visibility
-   - Best option for highly sensitive ideas
+   - Best option for highly sensitive problems
 
 4. **GitHub Pro/Team Feature** (if available):
    - Some GitHub plans support private workflows
@@ -758,7 +751,7 @@ The pipeline includes comprehensive monitoring and visibility features:
 Enable with the `--metrics` flag:
 
 ```bash
-ideation-claude --metrics "Your startup idea"
+ideation-claude --metrics "Your problem"
 ```
 
 Metrics are saved to `metrics/{topic}_metrics.json` and include:
