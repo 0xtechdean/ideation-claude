@@ -37,6 +37,8 @@ Phase 6: ┌─ Pivot Suggestions ─┐
 
 ## Installation
 
+### Option 1: Python Installation (Recommended for Development)
+
 ```bash
 # Clone the repo
 git clone https://github.com/0xtechdean/ideation-claude.git
@@ -54,7 +56,27 @@ cp .env.example .env
 # Edit .env with your API keys
 ```
 
+### Option 2: Docker Installation (Recommended for Production)
+
+```bash
+# Clone the repo
+git clone https://github.com/0xtechdean/ideation-claude.git
+cd ideation-claude
+
+# Set up environment variables
+cp .env.example .env
+# Edit .env with your API keys
+
+# Build the Docker image
+docker build -t ideation-claude:latest .
+
+# Or use docker-compose (recommended)
+docker-compose build
+```
+
 ## Usage
+
+### Python CLI Usage
 
 ```bash
 # Evaluate a startup idea
@@ -75,6 +97,58 @@ ideation-claude --output report.md "Your idea"
 # Use sub-agent orchestrator mode
 ideation-claude --subagent "Your idea"
 ```
+
+### Docker Usage
+
+**Using Docker directly:**
+
+```bash
+# Single idea evaluation
+docker run --rm \
+  -v "$PWD/.env:/app/.env:ro" \
+  -v "$PWD/reports:/app/reports" \
+  ideation-claude:latest \
+  "AI-powered legal research assistant"
+
+# Multiple ideas
+docker run --rm \
+  -v "$PWD/.env:/app/.env:ro" \
+  -v "$PWD/reports:/app/reports" \
+  ideation-claude:latest \
+  "Idea 1" "Idea 2" "Idea 3"
+
+# With custom threshold
+docker run --rm \
+  -v "$PWD/.env:/app/.env:ro" \
+  -v "$PWD/reports:/app/reports" \
+  ideation-claude:latest \
+  --threshold 6.0 "Your idea"
+
+# Sub-agent mode
+docker run --rm \
+  -v "$PWD/.env:/app/.env:ro" \
+  -v "$PWD/reports:/app/reports" \
+  ideation-claude:latest \
+  --subagent "Your idea"
+```
+
+**Using docker-compose (recommended):**
+
+```bash
+# Evaluate a single idea
+docker-compose run --rm ideation-claude "AI-powered legal research assistant"
+
+# Evaluate multiple ideas
+docker-compose run --rm ideation-claude "Idea 1" "Idea 2" "Idea 3"
+
+# With options
+docker-compose run --rm ideation-claude --threshold 6.0 --subagent "Your idea"
+
+# Interactive mode
+docker-compose run --rm ideation-claude --interactive
+```
+
+**Note:** Reports and outputs are automatically saved to the `reports/` directory on your host machine.
 
 ## Requirements
 
@@ -206,13 +280,26 @@ ideation-claude/
 │       ├── scoring_evaluator.md
 │       ├── pivot_advisor.md
 │       └── report_generator.md
+├── .github/
+│   ├── workflows/
+│   │   ├── ideation.yml         # Standard GitHub Actions workflow
+│   │   ├── ideation-docker.yml  # Docker-based GitHub Actions workflow
+│   │   └── ideation-private.yml # Privacy-focused workflow
+│   ├── ideas.txt.example        # Example ideas file
+│   └── PRIVACY.md               # Privacy guide
+├── Dockerfile                    # Docker image definition
+├── docker-compose.yml            # Docker Compose configuration
+├── .dockerignore                 # Docker ignore patterns
 ├── pyproject.toml
-└── .env.example
+└── .env.example                  # Environment variables template
 ```
 
 ## GitHub Actions Integration
 
-This project includes a GitHub Actions workflow that allows you to run evaluations automatically or on-demand.
+This project includes GitHub Actions workflows that allow you to run evaluations automatically or on-demand. Two workflow options are available:
+
+1. **Standard Workflow** (`ideation.yml`) - Runs directly on GitHub Actions runners with Python
+2. **Docker Workflow** (`ideation-docker.yml`) - Uses Docker for consistent environments
 
 ### Setup
 
@@ -278,14 +365,29 @@ gh workflow run ideation.yml \
   -f artifact_retention_days=7
 ```
 
+**Using Docker workflow:**
+```bash
+gh workflow run ideation-docker.yml \
+  -f idea="Your idea" \
+  -f threshold=6.0 \
+  -f subagent=true
+```
+
 ### Workflow Features
 
+**Standard Workflow:**
 - ✅ Automatic Python environment setup
 - ✅ Dependency installation
 - ✅ Secure secret management
 - ✅ Report artifact generation
 - ✅ PR comment integration (for pull requests)
 - ✅ Support for both orchestrator modes
+
+**Docker Workflow:**
+- ✅ Consistent environment across runs
+- ✅ Faster builds with layer caching
+- ✅ Isolated execution environment
+- ✅ Same input parameters as standard workflow
 
 ### Privacy Considerations for Public Repositories
 
@@ -320,6 +422,59 @@ gh workflow run ideation.yml \
 **API Keys are Safe**: Secrets stored in GitHub Secrets are masked in logs and never exposed, even in public repos.
 
 📖 **See `.github/PRIVACY.md` for detailed privacy guidance and solutions.**
+
+## Testing
+
+The project includes a comprehensive test suite using pytest.
+
+### Running Tests
+
+```bash
+# Install test dependencies
+pip install -e ".[test]"
+
+# Run all tests
+pytest
+
+# Run with coverage report
+pytest --cov=src/ideation_claude --cov-report=html
+
+# Run specific test file
+pytest tests/test_orchestrator.py
+
+# Run with verbose output
+pytest -v
+
+# Run only unit tests (fast)
+pytest -m unit
+
+# Run tests in parallel (if pytest-xdist installed)
+pytest -n auto
+```
+
+### Test Structure
+
+```
+tests/
+├── conftest.py           # Pytest fixtures and configuration
+├── test_orchestrator.py  # Tests for orchestrator module
+├── test_memory.py        # Tests for memory service
+├── test_main.py          # Tests for CLI interface
+└── test_utils.py         # Tests for utility functions
+```
+
+### Test Coverage
+
+The test suite aims for 60%+ code coverage. Coverage reports are generated in HTML format and can be viewed in `htmlcov/index.html`.
+
+### Continuous Integration
+
+Tests run automatically on:
+- Push to `main` or `develop` branches
+- Pull requests
+- Manual workflow dispatch
+
+The CI runs tests across Python 3.10, 3.11, and 3.12 to ensure compatibility.
 
 ## License
 

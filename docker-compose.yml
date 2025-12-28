@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  ideation-claude:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ideation-claude:latest
+    container_name: ideation-claude
+    volumes:
+      # Mount .env file (create it from .env.example first)
+      - ./.env:/app/.env:ro
+      # Mount reports directory to persist outputs
+      - ./reports:/app/reports
+      # Mount output directory
+      - ./output:/app/output
+      # Mount context directory
+      - ./context:/app/context
+      # Mount mem0 data directory for persistence
+      - ./.mem0_data:/app/.mem0_data
+    environment:
+      # Environment variables can be set here or via .env file
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - MEM0_API_KEY=${MEM0_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - MEM0_USER_ID=${MEM0_USER_ID:-ideation_claude}
+    # Override default command
+    command: ["--help"]
+    # Keep container running for interactive use
+    stdin_open: true
+    tty: true
+

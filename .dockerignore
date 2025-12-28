@@ -1,5 +1,10 @@
+# Git
+.git
+.gitignore
+.github
+
 # Python
-__pycache__/
+__pycache__
 *.py[cod]
 *$py.class
 *.so
@@ -31,7 +36,7 @@ ENV/
 *.swp
 *.swo
 
-# Environment
+# Environment (users should mount their own)
 .env
 .env.local
 
@@ -42,17 +47,18 @@ ENV/
 .DS_Store
 Thumbs.db
 
-# Output
+# Output (will be created in container)
 output/
 context/
 reports/
 *.log
 
-# Testing
-.pytest_cache/
-.coverage
-htmlcov/
-.tox/
-coverage.xml
-*.cover
-.hypothesis/
+# Documentation
+*.md
+!README.md
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose.yml
+
