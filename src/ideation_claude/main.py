@@ -14,7 +14,7 @@ from .orchestrator import evaluate_idea, evaluate_ideas
 from .orchestrator_subagent import evaluate_with_subagents
 
 
-@click.group(invoke_without_command=True)
+@click.group(invoke_without_command=True, allow_extra_args=True)
 @click.option(
     "--threshold",
     "-t",
@@ -52,9 +52,8 @@ from .orchestrator_subagent import evaluate_with_subagents
     is_flag=True,
     help="Save detailed metrics to JSON file",
 )
-@click.argument("topics", nargs=-1)
 @click.pass_context
-def cli(ctx, threshold, output, interactive, quiet, subagent, metrics, topics):
+def cli(ctx, threshold, output, interactive, quiet, subagent, metrics):
     """Ideation-Claude: Multi-agent startup idea validator.
 
     Evaluate startup ideas using Claude CLI agents that perform:
@@ -81,6 +80,9 @@ def cli(ctx, threshold, output, interactive, quiet, subagent, metrics, topics):
         # Interactive mode
         ideation-claude --interactive
     """
+    # Get topics from extra args if provided
+    topics = ctx.args if ctx.args else []
+    
     if interactive:
         asyncio.run(interactive_mode(threshold, quiet, subagent))
     elif topics:
