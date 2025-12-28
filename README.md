@@ -1,12 +1,12 @@
 # Ideation-Claude
 
-Multi-agent startup idea validator using Claude CLI instances.
+Multi-agent problem validator and solution finder using Claude CLI instances.
 
 Unlike traditional agent frameworks (CrewAI, LangChain), this project runs each agent as a **real Claude Code CLI instance**, leveraging the full power of Claude's capabilities including web search, file operations, and tool use.
 
 ## Architecture
 
-The Ideation-Claude system uses a multi-agent orchestration pattern to evaluate startup ideas through multiple specialized phases:
+The Ideation-Claude system uses a multi-agent orchestration pattern to validate problems and find solutions through multiple specialized phases:
 
 ```mermaid
 graph TB
@@ -273,11 +273,11 @@ docker-compose build
 ### Python CLI Usage
 
 ```bash
-# Evaluate a startup idea
-ideation-claude "AI-powered legal research assistant"
+# Evaluate a problem statement
+ideation-claude "Legal research is too time-consuming and expensive"
 
-# Evaluate multiple ideas
-ideation-claude "Legal AI" "Sustainable packaging marketplace"
+# Evaluate multiple problems
+ideation-claude "Finding sustainable packaging is difficult" "Personal finance management is confusing"
 
 # Interactive mode
 ideation-claude --interactive
@@ -413,8 +413,8 @@ The project uses Mem0 to build a comprehensive knowledge base of evaluated ideas
 
 ### What Gets Stored
 
-1. **All Evaluated Ideas** (both passed and eliminated)
-   - Topic, status, score, threshold
+1. **All Evaluated Problems** (both passed and eliminated)
+   - Problem statement, status, score, threshold
    - Complete evaluation results
    - Timestamp and metadata
 
@@ -426,17 +426,27 @@ The project uses Mem0 to build a comprehensive knowledge base of evaluated ideas
    - Hypothesis and MVP definitions
    - Customer discovery plans
 
-3. **Market Intelligence**
+3. **Phase Summaries** (concise summaries after each phase)
+   - 2-3 sentence summaries of key findings
+   - Generated automatically after each phase
+   - Focus on actionable insights
+   - Stored with type 'phase_summary' for easy retrieval
+   - Available for all phases: research, market_sizing, customer_discovery, 
+     competitor_analysis, resource_findings, hypothesis, problem_validation, 
+     solution_validation
+
+4. **Market Intelligence**
    - Searchable insights across all evaluations
    - Patterns and trends
-   - Similar idea detection
+   - Similar problem detection
 
 ### How It Works
 
 - **Automatic Storage**: All evaluations are automatically saved to memory
+- **Phase Summaries**: After each phase, a concise summary is generated and stored
 - **Context Retrieval**: Agents receive context about similar past evaluations
-- **Knowledge Building**: Phase outputs build a searchable knowledge base
-- **Similar Idea Detection**: Warns if a similar idea was previously eliminated
+- **Knowledge Building**: Phase outputs and summaries build a searchable knowledge base
+- **Similar Problem Detection**: Warns if a similar problem was previously eliminated
 
 ### Memory Modes
 
@@ -471,10 +481,12 @@ ideation-claude insights "market trends"
 
 ### Benefits
 
-- **Avoid Duplicate Work**: Detect similar ideas before evaluation
+- **Avoid Duplicate Work**: Detect similar problems before evaluation
 - **Learn from Past**: Agents use context from similar evaluations
 - **Build Knowledge Base**: Accumulate market intelligence over time
 - **Pattern Recognition**: Identify trends across evaluations
+- **Quick Insights**: Phase summaries provide fast access to key findings
+- **Searchable Summaries**: Find relevant insights quickly using phase summaries
 
 ## Orchestration Modes
 
