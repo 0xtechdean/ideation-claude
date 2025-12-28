@@ -86,11 +86,33 @@ ideation-claude --subagent "Your idea"
 
 ## Environment Variables
 
+Environment variables are loaded from a `.env` file in the project root. Each user should create their own `.env` file (it's gitignored and won't be committed).
+
+**Setup:**
+
 ```bash
-ANTHROPIC_API_KEY=your_key_here
-MEM0_API_KEY=your_key_here  # Optional
-OPENAI_API_KEY=your_key_here  # For local Mem0
+# Copy the example file
+cp .env.example .env
+
+# Edit .env with your actual API keys
+# Use your preferred editor (nano, vim, VS Code, etc.)
 ```
+
+**Required variables:**
+
+```bash
+ANTHROPIC_API_KEY=your_key_here  # Required
+```
+
+**Optional variables:**
+
+```bash
+MEM0_API_KEY=your_key_here      # Optional: For cloud memory storage
+OPENAI_API_KEY=your_key_here     # Optional: For local Mem0 embeddings
+MEM0_USER_ID=ideation_claude    # Optional: Defaults to "ideation_claude"
+```
+
+The `.env` file is automatically loaded when you run the CLI. You can also set these as system environment variables if you prefer.
 
 ## Architecture
 
@@ -203,23 +225,57 @@ This project includes a GitHub Actions workflow that allows you to run evaluatio
 
 2. **Workflow Triggers:**
    - **Manual Trigger**: Go to Actions → "Ideation Claude Evaluation" → Run workflow
-     - Enter your startup idea
-     - Set threshold (default: 5.0)
-     - Choose orchestrator mode (direct SDK or sub-agent)
    - **Scheduled**: Runs daily at 2 AM UTC (configurable in `.github/workflows/ideation.yml`)
    - **On Push**: Automatically runs when code changes are pushed to `main`
 
-3. **Batch Evaluation:**
+3. **Workflow Input Parameters** (for manual triggers):
+
+   | Parameter | Description | Required | Default |
+   |-----------|-------------|----------|---------|
+   | `idea` | Startup idea(s) to evaluate. Can be a single idea or comma-separated list | Yes | - |
+   | `ideas_file` | Path to ideas file (e.g., `.github/ideas.txt`). Overrides `idea` if provided | No | - |
+   | `threshold` | Elimination threshold (1-10) | No | `5.0` |
+   | `subagent` | Use sub-agent orchestrator mode | No | `false` |
+   | `quiet` | Suppress progress output | No | `false` |
+   | `python_version` | Python version to use | No | `3.10` |
+   | `artifact_retention_days` | Days to retain artifacts (0 = forever) | No | `30` |
+
+4. **Batch Evaluation:**
    - Create `.github/ideas.txt` with one idea per line
    - The workflow will evaluate all ideas and generate reports
    - Reports are saved as artifacts and can be downloaded
 
 ### Example Workflow Usage
 
-```yaml
-# Manual trigger via GitHub UI
-# Or use GitHub CLI:
+**Single idea:**
+```bash
+# Via GitHub UI: Enter idea in the input field
+# Via GitHub CLI:
 gh workflow run ideation.yml -f idea="AI-powered legal research assistant" -f threshold=6.0
+```
+
+**Multiple ideas (comma-separated):**
+```bash
+gh workflow run ideation.yml \
+  -f idea="AI legal assistant,Sustainable packaging,Personal finance AI" \
+  -f threshold=5.5 \
+  -f subagent=true
+```
+
+**Using ideas file:**
+```bash
+gh workflow run ideation.yml \
+  -f ideas_file=".github/ideas.txt" \
+  -f threshold=6.0 \
+  -f quiet=true
+```
+
+**With custom Python version:**
+```bash
+gh workflow run ideation.yml \
+  -f idea="Your idea" \
+  -f python_version=3.12 \
+  -f artifact_retention_days=7
 ```
 
 ### Workflow Features

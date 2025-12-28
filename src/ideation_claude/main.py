@@ -4,6 +4,10 @@ import asyncio
 from pathlib import Path
 
 import click
+from dotenv import load_dotenv
+
+# Load environment variables from .env file if it exists
+load_dotenv()
 
 from .orchestrator import evaluate_idea, evaluate_ideas
 from .orchestrator_subagent import evaluate_with_subagents

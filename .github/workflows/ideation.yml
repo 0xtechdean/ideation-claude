@@ -8,8 +8,13 @@ on:
   workflow_dispatch:
     inputs:
       idea:
-        description: 'Startup idea to evaluate'
+        description: 'Startup idea to evaluate (or comma-separated list)'
         required: true
+        type: string
+      ideas_file:
+        description: 'Path to ideas file (relative to repo root, e.g. .github/ideas.txt)'
+        required: false
+        default: ''
         type: string
       threshold:
         description: 'Elimination threshold (1-10)'
@@ -21,6 +26,25 @@ on:
         required: false
         default: false
         type: boolean
+      quiet:
+        description: 'Suppress progress output'
+        required: false
+        default: false
+        type: boolean
+      python_version:
+        description: 'Python version to use'
+        required: false
+        default: '3.10'
+        type: choice
+        options:
+          - '3.10'
+          - '3.11'
+          - '3.12'
+      artifact_retention_days:
+        description: 'Days to retain artifacts (0 = forever)'
+        required: false
+        default: '30'
+        type: string
   schedule:
     # Run daily at 2 AM UTC (adjust cron as needed)
     - cron: '0 2 * * *'
@@ -43,7 +67,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: ${{ github.event.inputs.python_version || '3.10' }}
           cache: 'pip'
 
       - name: Install dependencies
@@ -69,22 +93,52 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           mkdir -p reports
+          QUIET_FLAG=""
+          if [ "${{ github.event.inputs.quiet }}" = "true" ]; then
+            QUIET_FLAG="--quiet"
+          fi
+          
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            # Manual trigger with custom idea
-            if [ "${{ github.event.inputs.subagent }}" = "true" ]; then
-              ideation-claude --subagent --threshold ${{ github.event.inputs.threshold }} "${{ github.event.inputs.idea }}" --output "reports/$(echo "${{ github.event.inputs.idea }}" | tr ' ' '_' | tr -cd '[:alnum:]_').md"
+            # Manual trigger
+            IDEAS_FILE="${{ github.event.inputs.ideas_file }}"
+            
+            if [ -n "$IDEAS_FILE" ] && [ -f "$IDEAS_FILE" ]; then
+              # Use specified ideas file
+              echo "Reading ideas from: $IDEAS_FILE"
+              while IFS= read -r idea; do
+                [ -z "$idea" ] && continue
+                echo "Evaluating: $idea"
+                if [ "${{ github.event.inputs.subagent }}" = "true" ]; then
+                  ideation-claude $QUIET_FLAG --subagent --threshold ${{ github.event.inputs.threshold }} "$idea" --output "reports/$(echo "$idea" | tr ' ' '_' | tr -cd '[:alnum:]_').md"
+                else
+                  ideation-claude $QUIET_FLAG --threshold ${{ github.event.inputs.threshold }} "$idea" --output "reports/$(echo "$idea" | tr ' ' '_' | tr -cd '[:alnum:]_').md"
+                fi
+              done < "$IDEAS_FILE"
             else
-              ideation-claude --threshold ${{ github.event.inputs.threshold }} "${{ github.event.inputs.idea }}" --output "reports/$(echo "${{ github.event.inputs.idea }}" | tr ' ' '_' | tr -cd '[:alnum:]_').md"
+              # Use idea input (support comma-separated)
+              IDEAS="${{ github.event.inputs.idea }}"
+              IFS=',' read -ra IDEA_ARRAY <<< "$IDEAS"
+              for idea in "${IDEA_ARRAY[@]}"; do
+                idea=$(echo "$idea" | xargs)  # Trim whitespace
+                [ -z "$idea" ] && continue
+                echo "Evaluating: $idea"
+                if [ "${{ github.event.inputs.subagent }}" = "true" ]; then
+                  ideation-claude $QUIET_FLAG --subagent --threshold ${{ github.event.inputs.threshold }} "$idea" --output "reports/$(echo "$idea" | tr ' ' '_' | tr -cd '[:alnum:]_').md"
+                else
+                  ideation-claude $QUIET_FLAG --threshold ${{ github.event.inputs.threshold }} "$idea" --output "reports/$(echo "$idea" | tr ' ' '_' | tr -cd '[:alnum:]_').md"
+                fi
+              done
             fi
           else
-            # Scheduled or push trigger - use default ideas or read from file
-            if [ -f ".github/ideas.txt" ]; then
-              # Read ideas from file (one per line)
+            # Scheduled or push trigger - use default ideas file
+            IDEAS_FILE=".github/ideas.txt"
+            if [ -f "$IDEAS_FILE" ]; then
+              echo "Reading ideas from: $IDEAS_FILE"
               while IFS= read -r idea; do
                 [ -z "$idea" ] && continue
                 echo "Evaluating: $idea"
                 ideation-claude --quiet "$idea" --output "reports/$(echo "$idea" | tr ' ' '_' | tr -cd '[:alnum:]_').md"
-              done < .github/ideas.txt
+              done < "$IDEAS_FILE"
             else
               echo "No ideas.txt file found. Create .github/ideas.txt with one idea per line."
               exit 1
@@ -99,6 +153,7 @@ jobs:
           path: |
             reports/*.md
           if-no-files-found: ignore
+          retention-days: ${{ github.event.inputs.artifact_retention_days || 30 }}
 
       - name: Comment on PR
         if: github.event_name == 'pull_request'
