@@ -107,9 +107,9 @@ jobs:
               echo "Evaluating: $idea"
               OUTPUT_FILE="reports/$(echo "$idea" | tr ' ' '_' | tr -cd '[:alnum:]_').md"
               if [ "${{ github.event.inputs.subagent }}" = "true" ]; then
-                docker run --rm --entrypoint="" -v "$PWD/reports:/app/reports" -v "$PWD/$IDEAS_FILE:/app/$IDEAS_FILE:ro" -e ANTHROPIC_API_KEY -e MEM0_API_KEY -e OPENAI_API_KEY ideation-claude:latest python3 -c "import sys; sys.argv = ['ideation-claude', '--subagent', '--threshold', '${{ github.event.inputs.threshold }}', '$idea']; from ideation_claude.main import main; main()" > "$OUTPUT_FILE" 2>&1 || true
+                docker run --rm --entrypoint="" -v "$PWD/reports:/app/reports" -v "$PWD/$IDEAS_FILE:/app/$IDEAS_FILE:ro" -e ANTHROPIC_API_KEY -e MEM0_API_KEY -e OPENAI_API_KEY -e IDEA="$idea" -e THRESHOLD="${{ github.event.inputs.threshold }}" ideation-claude:latest python3 -c "import os, sys; idea = os.environ.get('IDEA', ''); threshold = os.environ.get('THRESHOLD', '5.0'); sys.argv = ['ideation-claude', '--subagent', '--threshold', threshold, idea]; from ideation_claude.main import main; main()" > "$OUTPUT_FILE" 2>&1 || true
               else
-                docker run --rm --entrypoint="" -v "$PWD/reports:/app/reports" -v "$PWD/$IDEAS_FILE:/app/$IDEAS_FILE:ro" -e ANTHROPIC_API_KEY -e MEM0_API_KEY -e OPENAI_API_KEY ideation-claude:latest python3 -c "import sys; sys.argv = ['ideation-claude', '--threshold', '${{ github.event.inputs.threshold }}', '$idea']; from ideation_claude.main import main; main()" > "$OUTPUT_FILE" 2>&1 || true
+                docker run --rm --entrypoint="" -v "$PWD/reports:/app/reports" -v "$PWD/$IDEAS_FILE:/app/$IDEAS_FILE:ro" -e ANTHROPIC_API_KEY -e MEM0_API_KEY -e OPENAI_API_KEY -e IDEA="$idea" -e THRESHOLD="${{ github.event.inputs.threshold }}" ideation-claude:latest python3 -c "import os, sys; idea = os.environ.get('IDEA', ''); threshold = os.environ.get('THRESHOLD', '5.0'); sys.argv = ['ideation-claude', '--threshold', threshold, idea]; from ideation_claude.main import main; main()" > "$OUTPUT_FILE" 2>&1 || true
               fi
             done < "$IDEAS_FILE"
           else
@@ -122,9 +122,9 @@ jobs:
               echo "Evaluating: $idea"
               OUTPUT_FILE="reports/$(echo "$idea" | tr ' ' '_' | tr -cd '[:alnum:]_').md"
               if [ "${{ github.event.inputs.subagent }}" = "true" ]; then
-                docker run --rm --entrypoint="" -v "$PWD/reports:/app/reports" -e ANTHROPIC_API_KEY -e MEM0_API_KEY -e OPENAI_API_KEY ideation-claude:latest python3 -c "import sys; sys.argv = ['ideation-claude', '--subagent', '--threshold', '${{ github.event.inputs.threshold }}', '$idea']; from ideation_claude.main import main; main()" > "$OUTPUT_FILE" 2>&1 || true
+                docker run --rm --entrypoint="" -v "$PWD/reports:/app/reports" -e ANTHROPIC_API_KEY -e MEM0_API_KEY -e OPENAI_API_KEY -e IDEA="$idea" -e THRESHOLD="${{ github.event.inputs.threshold }}" ideation-claude:latest python3 -c "import os, sys; idea = os.environ.get('IDEA', ''); threshold = os.environ.get('THRESHOLD', '5.0'); sys.argv = ['ideation-claude', '--subagent', '--threshold', threshold, idea]; from ideation_claude.main import main; main()" > "$OUTPUT_FILE" 2>&1 || true
               else
-                docker run --rm --entrypoint="" -v "$PWD/reports:/app/reports" -e ANTHROPIC_API_KEY -e MEM0_API_KEY -e OPENAI_API_KEY ideation-claude:latest python3 -c "import sys; sys.argv = ['ideation-claude', '--threshold', '${{ github.event.inputs.threshold }}', '$idea']; from ideation_claude.main import main; main()" > "$OUTPUT_FILE" 2>&1 || true
+                docker run --rm --entrypoint="" -v "$PWD/reports:/app/reports" -e ANTHROPIC_API_KEY -e MEM0_API_KEY -e OPENAI_API_KEY -e IDEA="$idea" -e THRESHOLD="${{ github.event.inputs.threshold }}" ideation-claude:latest python3 -c "import os, sys; idea = os.environ.get('IDEA', ''); threshold = os.environ.get('THRESHOLD', '5.0'); sys.argv = ['ideation-claude', '--threshold', threshold, idea]; from ideation_claude.main import main; main()" > "$OUTPUT_FILE" 2>&1 || true
               fi
             done
           fi
