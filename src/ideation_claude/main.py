@@ -81,31 +81,33 @@ def cli(ctx, threshold, output, interactive, quiet, subagent, metrics):
         # Interactive mode
         ideation-claude --interactive
     """
-    # Get topics from sys.argv - parse manually to handle Click's limitations
-    # Known commands that should not be treated as topics
-    known_commands = {'add', 'pending', 'search', 'list', 'similar', 'insights'}
-    
-    # Get remaining args after Click has parsed options
-    # We need to manually extract topics from the original argv
+    # Get topics from remaining args
+    # Click groups with invoke_without_command still try to match commands
+    # So we need to check ctx.args (remaining unparsed args) or ctx.params
     topics = []
     if ctx.invoked_subcommand is None:
-        # Parse sys.argv to find topics (non-option, non-command arguments)
-        skip_next = False
-        for i, arg in enumerate(sys.argv[1:], 1):  # Skip script name
-            if skip_next:
-                skip_next = False
-                continue
-            # Skip if it's an option
-            if arg.startswith('-'):
-                # Check if option takes a value
-                if arg in ['-t', '--threshold', '-o', '--output']:
-                    skip_next = True
-                continue
-            # Skip if it's a known command
-            if arg in known_commands:
-                continue
-            # It's a topic
-            topics.append(arg)
+        # Check if there are remaining args that weren't matched as commands
+        # These should be topics
+        remaining_args = getattr(ctx, 'args', [])
+        if not remaining_args:
+            # Try to get from params if stored there
+            remaining_args = ctx.params.get('_topics', [])
+        if not remaining_args:
+            # Last resort: parse sys.argv manually
+            known_commands = {'add', 'pending', 'search', 'list', 'similar', 'insights'}
+            skip_next = False
+            for arg in sys.argv[1:]:  # Skip script name
+                if skip_next:
+                    skip_next = False
+                    continue
+                if arg.startswith('-'):
+                    if arg in ['-t', '--threshold', '-o', '--output']:
+                        skip_next = True
+                    continue
+                if arg not in known_commands:
+                    topics.append(arg)
+        else:
+            topics = remaining_args
     
     if interactive:
         asyncio.run(interactive_mode(threshold, quiet, subagent))
