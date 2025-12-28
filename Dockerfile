@@ -3,9 +3,12 @@ FROM python:3.10-slim as builder
 
 WORKDIR /build
 
-# Install build dependencies
+# Install build dependencies including Node.js
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    curl \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy dependency files and source code
@@ -22,13 +25,18 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
-# Install runtime dependencies
+# Install runtime dependencies including Node.js
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy installed package from builder
 COPY --from=builder /root/.local /root/.local
+
+# Install Claude Code CLI
+RUN npm install -g @anthropic-ai/claude-code
 
 # Copy application code (needed for runtime)
 COPY src/ ./src/
