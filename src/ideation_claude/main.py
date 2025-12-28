@@ -53,8 +53,14 @@ from .orchestrator_subagent import evaluate_with_subagents
     is_flag=True,
     help="Save detailed metrics to JSON file",
 )
+@click.option(
+    "--problem-only",
+    "-p",
+    is_flag=True,
+    help="Only run problem validation phase (focus on validating the problem)",
+)
 @click.pass_context
-def cli(ctx, threshold, output, interactive, quiet, subagent, metrics):
+def cli(ctx, threshold, output, interactive, quiet, subagent, metrics, problem_only):
     """Ideation-Claude: Multi-agent startup idea validator.
 
     Evaluate startup ideas using Claude CLI agents that perform:
@@ -112,7 +118,7 @@ def cli(ctx, threshold, output, interactive, quiet, subagent, metrics):
     if interactive:
         asyncio.run(interactive_mode(threshold, quiet, subagent))
     elif topics:
-        asyncio.run(run_evaluation(list(topics), threshold, output, not quiet, subagent, metrics))
+        asyncio.run(run_evaluation(list(topics), threshold, output, not quiet, subagent, metrics, problem_only))
     elif ctx.invoked_subcommand is None:
         click.echo(ctx.get_help())
 
@@ -124,6 +130,7 @@ async def run_evaluation(
     verbose: bool,
     subagent: bool = False,
     metrics: bool = False,
+    problem_only: bool = False,
 ):
     """Run the evaluation pipeline."""
     from .monitoring import PipelineMonitor
@@ -144,10 +151,10 @@ async def run_evaluation(
     elif len(topics) == 1:
         if metrics:
             with PipelineMonitor(topics[0], threshold, verbose, "direct") as monitor:
-                result = await evaluate_idea(topics[0], threshold, verbose, monitor=monitor)
+                result = await evaluate_idea(topics[0], threshold, verbose, monitor=monitor, problem_only=problem_only)
                 monitor.complete_evaluation(result.total_score, result.eliminated)
         else:
-            result = await evaluate_idea(topics[0], threshold, verbose)
+            result = await evaluate_idea(topics[0], threshold, verbose, problem_only=problem_only)
         results = [result]
     else:
         results = await evaluate_ideas(topics, threshold, verbose)
@@ -245,7 +252,7 @@ async def interactive_mode(threshold: float, quiet: bool, subagent: bool = False
             if not topics:
                 click.echo("No ideas to evaluate. Use 'add <idea>' first.")
             else:
-                await run_evaluation(topics, threshold, None, not quiet, subagent)
+                await run_evaluation(topics, threshold, None, not quiet, subagent, False, False)
                 topics.clear()
 
         elif cmd == "mode" or cmd == "m":
@@ -449,7 +456,7 @@ def _handle_as_evaluation():
                 metrics = True
             i += 1
         
-        asyncio.run(run_evaluation(topics, threshold, output, not quiet, subagent, metrics))
+        asyncio.run(run_evaluation(topics, threshold, output, not quiet, subagent, metrics, False))
 
 
 if __name__ == "__main__":
