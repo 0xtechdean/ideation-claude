@@ -7,26 +7,33 @@ Unlike traditional agent frameworks (CrewAI, LangChain), this project runs each 
 ## Features
 
 - **9 Specialized Agents**: Each with a specific role in the validation pipeline
-- **Session-Based Context**: Agents share context through Claude's session management
+- **Parallel Execution**: Independent agents run concurrently for faster evaluation
 - **Lean Startup Methodology**: Hypothesis extraction and MVP definition
 - **Mom Test Framework**: Customer discovery interview planning
 - **8-Criteria Scoring**: Objective evaluation with go/no-go decisions
 - **Pivot Suggestions**: Strategic alternatives for eliminated ideas
 - **Memory Integration**: Track previously eliminated ideas with Mem0
 
-## Pipeline
+## Pipeline (Optimized with Parallel Execution)
 
 ```
-1. Researcher        → Market trends & pain points
-2. Competitor Analyst → Competitive landscape
-3. Market Analyst    → TAM/SAM/SOM sizing
-4. Resource Scout    → Datasets, APIs, tools
-5. Hypothesis Architect → Lean Startup assumptions & MVP
-6. Customer Discovery → Mom Test interview planning
-7. Scoring Evaluator → 8-criteria evaluation
-8. Pivot Advisor     → Suggestions for eliminated ideas
-9. Report Generator  → Final evaluation report
+Phase 1: Research
+            ↓
+Phase 2: ┌─ Competitor Analysis ─┐
+         ├─ Market Sizing       ─┼─ (parallel)
+         └─ Resource Discovery  ─┘
+            ↓
+Phase 3: Hypothesis & MVP (Lean Startup)
+            ↓
+Phase 4: Customer Discovery (Mom Test)
+            ↓
+Phase 5: Scoring (8 criteria)
+            ↓
+Phase 6: ┌─ Pivot Suggestions ─┐
+         └─ Report Generation ─┘ (parallel, if eliminated)
 ```
+
+**9 agents, 6 phases** - Parallel execution reduces evaluation time significantly.
 
 ## Installation
 
@@ -87,9 +94,23 @@ OPENAI_API_KEY=your_key_here  # For local Mem0
 Each agent is a Claude CLI invocation with:
 - A specialized system prompt (`.md` file)
 - Access to specific tools (WebSearch, Read, etc.)
-- Session context from previous agents
+- Context passed explicitly between phases
 
-The orchestrator manages the pipeline, passing session IDs between agents to maintain context.
+The orchestrator manages the pipeline using `asyncio.gather()` to run independent agents in parallel.
+
+### Agent Details
+
+| Agent | Role | Tools |
+|-------|------|-------|
+| Researcher | Market trends & pain points | WebSearch |
+| Competitor Analyst | Competitive landscape | WebSearch |
+| Market Analyst | TAM/SAM/SOM sizing | WebSearch |
+| Resource Scout | Datasets, APIs, tools | WebSearch |
+| Hypothesis Architect | Lean Startup assumptions | - |
+| Customer Discovery | Mom Test interview planning | - |
+| Scoring Evaluator | 8-criteria scoring | - |
+| Pivot Advisor | Strategic alternatives | - |
+| Report Generator | Final evaluation report | - |
 
 ## Comparison to CrewAI
 
@@ -97,8 +118,31 @@ The orchestrator manages the pipeline, passing session IDs between agents to mai
 |--------|--------|-----------------|
 | Agent runtime | LLM API calls | Real Claude CLI instances |
 | Tools | Framework wrappers | Native Claude tools |
-| Context | Task parameters | Session resume |
+| Context | Task parameters | Explicit context passing |
+| Parallelism | Sequential by default | Parallel by default |
 | Overhead | Heavy framework | Minimal SDK |
+
+## Project Structure
+
+```
+ideation-claude/
+├── src/ideation_claude/
+│   ├── main.py              # CLI interface
+│   ├── orchestrator.py      # Pipeline with parallel execution
+│   ├── memory.py            # Mem0 integration
+│   └── agents/              # System prompts
+│       ├── researcher.md
+│       ├── competitor_analyst.md
+│       ├── market_analyst.md
+│       ├── resource_scout.md
+│       ├── hypothesis_architect.md
+│       ├── customer_discovery.md
+│       ├── scoring_evaluator.md
+│       ├── pivot_advisor.md
+│       └── report_generator.md
+├── pyproject.toml
+└── .env.example
+```
 
 ## License
 
