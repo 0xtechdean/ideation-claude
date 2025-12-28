@@ -71,6 +71,9 @@ ideation-claude --threshold 6.0 "Your idea"
 
 # Save report to file
 ideation-claude --output report.md "Your idea"
+
+# Use sub-agent orchestrator mode
+ideation-claude --subagent "Your idea"
 ```
 
 ## Requirements
@@ -97,6 +100,46 @@ Each agent is a Claude CLI invocation with:
 - Context passed explicitly between phases
 
 The orchestrator manages the pipeline using `asyncio.gather()` to run independent agents in parallel.
+
+## Orchestration Modes
+
+The project supports two orchestration modes:
+
+### 1. Direct SDK Mode (default)
+
+Each agent runs as a separate Claude CLI instance with explicit context passing between phases.
+
+```bash
+ideation-claude "Your idea"
+```
+
+**Characteristics:**
+- Python spawns separate Claude instances for each agent
+- Context passed explicitly between phases
+- More control over each agent's behavior
+- Parallel execution via `asyncio.gather()`
+
+### 2. Sub-Agent Mode
+
+A single Claude coordinator instance uses the Task tool to spawn specialized sub-agents.
+
+```bash
+ideation-claude --subagent "Your idea"
+```
+
+**Characteristics:**
+- Single coordinator orchestrates the entire pipeline
+- Sub-agents share parent context automatically
+- More native to Claude Code architecture
+- Sub-agents can spawn their own sub-agents (nested)
+- Better for complex multi-step research
+
+| Aspect | Direct SDK | Sub-Agent |
+|--------|-----------|-----------|
+| Instances | Multiple Claude instances | Single coordinator |
+| Context | Explicit passing | Automatic inheritance |
+| Control | Fine-grained | Delegated to coordinator |
+| Nesting | Manual | Native support |
 
 ### Agent Details
 
@@ -127,10 +170,11 @@ The orchestrator manages the pipeline using `asyncio.gather()` to run independen
 ```
 ideation-claude/
 ├── src/ideation_claude/
-│   ├── main.py              # CLI interface
-│   ├── orchestrator.py      # Pipeline with parallel execution
-│   ├── memory.py            # Mem0 integration
-│   └── agents/              # System prompts
+│   ├── main.py                  # CLI interface
+│   ├── orchestrator.py          # Direct SDK pipeline with parallel execution
+│   ├── orchestrator_subagent.py # Sub-agent orchestrator using Task tool
+│   ├── memory.py                # Mem0 integration
+│   └── agents/                  # System prompts
 │       ├── researcher.md
 │       ├── competitor_analyst.md
 │       ├── market_analyst.md

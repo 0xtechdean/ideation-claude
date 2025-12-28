@@ -6,6 +6,7 @@ from pathlib import Path
 import click
 
 from .orchestrator import evaluate_idea, evaluate_ideas
+from .orchestrator_subagent import evaluate_with_subagents
 
 
 @click.group(invoke_without_command=True)
@@ -35,8 +36,14 @@ from .orchestrator import evaluate_idea, evaluate_ideas
     is_flag=True,
     help="Suppress progress output",
 )
+@click.option(
+    "--subagent",
+    "-s",
+    is_flag=True,
+    help="Use sub-agent orchestrator (single coordinator spawns sub-agents)",
+)
 @click.pass_context
-def cli(ctx, topics, threshold, output, interactive, quiet):
+def cli(ctx, topics, threshold, output, interactive, quiet, subagent):
     """Ideation-Claude: Multi-agent startup idea validator.
 
     Evaluate startup ideas using Claude CLI agents that perform:
@@ -64,9 +71,9 @@ def cli(ctx, topics, threshold, output, interactive, quiet):
         ideation-claude --interactive
     """
     if interactive:
-        asyncio.run(interactive_mode(threshold, quiet))
+        asyncio.run(interactive_mode(threshold, quiet, subagent))
     elif topics:
-        asyncio.run(run_evaluation(list(topics), threshold, output, not quiet))
+        asyncio.run(run_evaluation(list(topics), threshold, output, not quiet, subagent))
     elif ctx.invoked_subcommand is None:
         click.echo(ctx.get_help())
 
@@ -76,9 +83,18 @@ async def run_evaluation(
     threshold: float,
     output: str | None,
     verbose: bool,
+    subagent: bool = False,
 ):
     """Run the evaluation pipeline."""
-    if len(topics) == 1:
+    if subagent:
+        # Use sub-agent orchestrator (single coordinator spawns sub-agents)
+        if verbose:
+            click.echo("Using sub-agent orchestrator mode...")
+        results = []
+        for topic in topics:
+            result = await evaluate_with_subagents(topic, threshold, verbose)
+            results.append(result)
+    elif len(topics) == 1:
         result = await evaluate_idea(topics[0], threshold, verbose)
         results = [result]
     else:
@@ -114,11 +130,13 @@ async def run_evaluation(
         click.echo(f"\nReport saved to: {output}")
 
 
-async def interactive_mode(threshold: float, quiet: bool):
+async def interactive_mode(threshold: float, quiet: bool, subagent: bool = False):
     """Run in interactive mode."""
     topics: list[str] = []
 
     click.echo("Ideation-Claude Interactive Mode")
+    if subagent:
+        click.echo("(Sub-agent orchestrator mode)")
     click.echo("=" * 40)
     click.echo("Commands:")
     click.echo("  add <idea>  - Add an idea to evaluate")
@@ -126,6 +144,7 @@ async def interactive_mode(threshold: float, quiet: bool):
     click.echo("  clear       - Clear all ideas")
     click.echo("  run         - Run evaluation on all ideas")
     click.echo("  threshold   - Set elimination threshold")
+    click.echo("  mode        - Toggle sub-agent mode")
     click.echo("  help        - Show this help")
     click.echo("  quit        - Exit")
     click.echo()
@@ -148,7 +167,7 @@ async def interactive_mode(threshold: float, quiet: bool):
             break
 
         elif cmd == "help" or cmd == "h":
-            click.echo("Commands: add, list, clear, run, threshold, help, quit")
+            click.echo("Commands: add, list, clear, run, threshold, mode, help, quit")
 
         elif cmd == "add" or cmd == "a":
             if len(parts) > 1:
@@ -174,8 +193,13 @@ async def interactive_mode(threshold: float, quiet: bool):
             if not topics:
                 click.echo("No ideas to evaluate. Use 'add <idea>' first.")
             else:
-                await run_evaluation(topics, threshold, None, not quiet)
+                await run_evaluation(topics, threshold, None, not quiet, subagent)
                 topics.clear()
+
+        elif cmd == "mode" or cmd == "m":
+            subagent = not subagent
+            mode_name = "sub-agent" if subagent else "direct SDK"
+            click.echo(f"Switched to {mode_name} orchestrator mode.")
 
         elif cmd == "threshold" or cmd == "t":
             if len(parts) > 1:
