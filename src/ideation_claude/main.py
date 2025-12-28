@@ -15,36 +15,7 @@ from .orchestrator import evaluate_idea, evaluate_ideas
 from .orchestrator_subagent import evaluate_with_subagents
 
 
-class CustomGroup(click.Group):
-    """Custom group that handles extra arguments as topics."""
-    def make_context(self, info_name, args, **extra):
-        # Separate options from topics
-        remaining = []
-        topics = []
-        i = 0
-        while i < len(args):
-            arg = args[i]
-            # Check if it's an option
-            if arg.startswith('-'):
-                remaining.append(arg)
-                # If it's an option that takes a value, include the next arg
-                if arg in ['-t', '--threshold', '-o', '--output'] and i + 1 < len(args):
-                    i += 1
-                    remaining.append(args[i])
-            else:
-                # It's a topic argument - only add if not a known command
-                if arg not in ['add', 'pending', 'search', 'list', 'similar', 'insights']:
-                    topics.append(arg)
-                else:
-                    remaining.append(arg)
-            i += 1
-        
-        # Store topics in extra for context
-        extra['_topics'] = topics
-        return super().make_context(info_name, remaining, **extra)
-
-
-@click.group(cls=CustomGroup, invoke_without_command=True)
+@click.group(invoke_without_command=True)
 @click.option(
     "--threshold",
     "-t",
@@ -110,8 +81,32 @@ def cli(ctx, threshold, output, interactive, quiet, subagent, metrics):
         # Interactive mode
         ideation-claude --interactive
     """
-    # Get topics from context (parsed by CustomGroup)
-    topics = ctx.params.get('_topics', [])
+    # Get topics from sys.argv - parse manually to handle Click's limitations
+    # Known commands that should not be treated as topics
+    known_commands = {'add', 'pending', 'search', 'list', 'similar', 'insights'}
+    
+    # Get remaining args after Click has parsed options
+    # We need to manually extract topics from the original argv
+    topics = []
+    if ctx.invoked_subcommand is None:
+        # Parse sys.argv to find topics (non-option, non-command arguments)
+        skip_next = False
+        for i, arg in enumerate(sys.argv[1:], 1):  # Skip script name
+            if skip_next:
+                skip_next = False
+                continue
+            # Skip if it's an option
+            if arg.startswith('-'):
+                # Check if option takes a value
+                if arg in ['-t', '--threshold', '-o', '--output']:
+                    skip_next = True
+                continue
+            # Skip if it's a known command
+            if arg in known_commands:
+                continue
+            # It's a topic
+            topics.append(arg)
+    
     if interactive:
         asyncio.run(interactive_mode(threshold, quiet, subagent))
     elif topics:
