@@ -100,8 +100,6 @@ SOLUTION VALIDATION PHASE
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `MEM0_API_KEY` | Yes | Mem0 cloud storage |
-| `GITHUB_TOKEN` | Yes | Token with repo dispatch permissions |
-| `OPENAI_API_KEY` | Yes | For Mem0 embeddings |
 
 ## Context Sharing via Mem0
 
