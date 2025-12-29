@@ -95,22 +95,6 @@ SOLUTION VALIDATION PHASE
 /ideation evaluate "Legal research is too time-consuming and expensive"
 ```
 
-### Via CLI (Development)
-
-```bash
-# Install
-pip install -e .
-
-# Evaluate a problem
-ideation-claude "Legal research is too time-consuming and expensive"
-
-# With custom threshold
-ideation-claude --threshold 6.0 "Your problem"
-
-# Problem validation only
-ideation-claude --problem-only "Your problem"
-```
-
 ## Environment Variables
 
 | Variable | Required | Description |
