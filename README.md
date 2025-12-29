@@ -9,37 +9,41 @@ Multi-agent startup problem validator using Claude Code.
 │                     Cursor Slack App                             │
 │              /ideation evaluate "problem"                        │
 └─────────────────────────────┬───────────────────────────────────┘
-                              │ webhook + repo URL
+                              │ triggers
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                      claude.ai/code                              │
-│  Opens repo URL → Reads CLAUDE.md → Executes agent logic         │
-│  (Runs sequentially: researcher → market-analyst → ... )        │
-└─────────────────────────────┬───────────────────────────────────┘
-                              │ read/write
-                              ▼
-                    ┌───────────────────┐
-                    │       Mem0        │
-                    │  (Shared Context) │
-                    └───────────────────┘
+│                    ORCHESTRATOR (this repo)                      │
+│         claude.ai/code reads CLAUDE.md, manages flow             │
+│                              │                                   │
+│    ┌─────────────────────────┼─────────────────────────┐        │
+│    │ Uses Slack hooks to     │                         │        │
+│    │ invoke sub-agents:      ▼                         │        │
+│    │                   ┌───────────┐                   │        │
+│    │  researcher ────▶ │   Mem0    │ ◀──── scoring     │        │
+│    │  market-analyst ▶ │ (context) │ ◀──── pivot       │        │
+│    │  customer-disc ─▶ │           │ ◀──── report      │        │
+│    │                   └───────────┘                   │        │
+│    └───────────────────────────────────────────────────┘        │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ## How It Works
 
 1. User in Slack: `/ideation evaluate "Legal research is too expensive"`
-2. Cursor Slack App receives the command
-3. Slack App triggers [claude.ai/code](https://claude.ai/code) with:
-   - Repo URL: `github.com/Othentic-Ai/ideation-agent-researcher`
-   - Prompt: session_id + problem statement
-4. claude.ai/code opens the repo, reads `CLAUDE.md`, executes
-5. Agent writes results to Mem0 under session_id
-6. Slack App triggers next agent (market-analyst)
-7. Repeat for all 9 agents
-8. Final report posted back to Slack
+2. Slack App triggers claude.ai/code with **this orchestrator repo**
+3. Orchestrator reads CLAUDE.md and manages the entire flow
+4. For each agent, Orchestrator uses Slack hooks to invoke:
+   ```
+   /claude run github.com/Othentic-Ai/ideation-agent-{name}
+   ```
+5. Each agent reads context from Mem0, executes, writes results back
+6. Orchestrator checks Mem0 for completion, handles scoring decisions
+7. Orchestrator continues to next agent or eliminates based on score
+8. Final report returned to Slack
 
 ## Agent Repositories
 
-Each agent is a minimal repo with just `CLAUDE.md` + `README.md`:
+Each agent is a minimal repo with just `CLAUDE.md`:
 
 | Agent | Repository | Role |
 |-------|------------|------|
@@ -53,28 +57,20 @@ Each agent is a minimal repo with just `CLAUDE.md` + `README.md`:
 | Pivot Advisor | [ideation-agent-pivot-advisor](https://github.com/Othentic-Ai/ideation-agent-pivot-advisor) | Strategic alternatives |
 | Report Generator | [ideation-agent-report-generator](https://github.com/Othentic-Ai/ideation-agent-report-generator) | Final evaluation report |
 
-### Agent Repo Structure
-
-```
-ideation-agent-{name}/
-├── CLAUDE.md        # Agent instructions (Claude Code reads this)
-└── README.md        # Documentation
-```
-
-No Python packages, no GitHub Actions - just instructions for Claude Code.
-
 ## Evaluation Pipeline
 
 ```
+ORCHESTRATOR manages this flow:
+
 PROBLEM VALIDATION PHASE
 ├── 1. Researcher Agent (trends & pain points)
 ├── 2. Market Analyst Agent (TAM/SAM/SOM)
 ├── 3. Customer Discovery Agent (Mom Test)
 └── 4. Scoring Evaluator Agent (problem score)
         │
-        ├── Score < Threshold? → ELIMINATE → Pivot Advisor → Report
+        ├── Score < 5.0? → ELIMINATE → Pivot Advisor → Report
         │
-        └── Score ≥ Threshold? → Continue ↓
+        └── Score >= 5.0? → Continue ↓
 
 SOLUTION VALIDATION PHASE
 ├── 5. Competitor Analyst Agent (landscape)
@@ -89,8 +85,6 @@ SOLUTION VALIDATION PHASE
 
 ## Usage
 
-### Via Cursor Slack App
-
 ```bash
 /ideation evaluate "Legal research is too time-consuming and expensive"
 ```
@@ -103,7 +97,7 @@ SOLUTION VALIDATION PHASE
 
 ## Context Sharing via Mem0
 
-Each agent reads/writes to Mem0 using the session_id:
+Orchestrator and all agents read/write to Mem0 using the session_id:
 
 ```json
 {
@@ -124,14 +118,12 @@ Each agent reads/writes to Mem0 using the session_id:
 
 ## Features
 
-- **Problem-First Validation**: Validates the problem before evaluating the solution
-- **Early Elimination**: Stops immediately if problem validation fails
-- **Minimal Agent Repos**: Just CLAUDE.md instructions - no code needed
-- **claude.ai/code Execution**: Slack webhook triggers Claude Code directly
+- **Orchestrator-Managed Flow**: Single orchestrator controls entire pipeline
+- **Slack Hooks for Sub-Agents**: Orchestrator invokes agents via Slack
+- **Problem-First Validation**: Validates problem before solution
+- **Early Elimination**: Stops immediately if score < 5.0
 - **Mem0 Context**: Shared session state across all agents
-- **Two-Phase Pipeline**: Problem validation → Solution validation
 - **Weighted Scoring**: 60% problem + 40% solution
-- **Pivot Suggestions**: Strategic alternatives for eliminated problems
 
 ## License
 
