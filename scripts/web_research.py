@@ -1,0 +1,425 @@
+"""
+Web Research Helper Scripts for Ideation Agents
+Uses Serper API for web searches, Google Trends, and X (Twitter) data
+"""
+
+import os
+import requests
+from typing import Dict, List, Optional
+from datetime import datetime, timedelta
+
+SERPER_API_KEY = os.environ.get("SERPER_API_KEY")
+SERPER_BASE_URL = "https://google.serper.dev"
+
+# Optional: X (Twitter) API credentials
+X_BEARER_TOKEN = os.environ.get("X_BEARER_TOKEN")
+
+
+def search_web(query: str, num_results: int = 10) -> Dict:
+    """
+    Perform a web search using Serper API.
+
+    Args:
+        query: Search query string
+        num_results: Number of results to return (default 10)
+
+    Returns:
+        Dict with search results including organic results, knowledge graph, etc.
+    """
+    headers = {
+        "X-API-KEY": SERPER_API_KEY,
+        "Content-Type": "application/json"
+    }
+
+    payload = {
+        "q": query,
+        "num": num_results
+    }
+
+    response = requests.post(
+        f"{SERPER_BASE_URL}/search",
+        headers=headers,
+        json=payload
+    )
+
+    return response.json()
+
+
+def search_market_data(industry: str, keywords: List[str] = None) -> Dict:
+    """
+    Search for market data, trends, and statistics for an industry.
+
+    Args:
+        industry: Industry or market to research
+        keywords: Additional keywords to include in search
+
+    Returns:
+        Dict with market size, growth rates, and trend data
+    """
+    queries = [
+        f"{industry} market size 2024 2025",
+        f"{industry} industry growth rate forecast",
+        f"{industry} market trends statistics",
+    ]
+
+    if keywords:
+        queries.extend([f"{industry} {kw}" for kw in keywords])
+
+    results = {
+        "market_size": search_web(queries[0], 5),
+        "growth_forecast": search_web(queries[1], 5),
+        "trends": search_web(queries[2], 5)
+    }
+
+    return results
+
+
+def search_competitors(industry: str, product_type: str = None) -> List[Dict]:
+    """
+    Search for competitors in a specific industry.
+
+    Args:
+        industry: Industry to search competitors in
+        product_type: Specific product type (optional)
+
+    Returns:
+        List of competitor information
+    """
+    query = f"{industry} competitors companies"
+    if product_type:
+        query = f"{product_type} {industry} competitors alternatives"
+
+    results = search_web(query, 15)
+
+    # Also search for comparison articles
+    comparison_query = f"{industry} tools comparison review 2024"
+    comparison_results = search_web(comparison_query, 10)
+
+    return {
+        "competitors": results.get("organic", []),
+        "comparisons": comparison_results.get("organic", []),
+        "knowledge_graph": results.get("knowledgeGraph", {})
+    }
+
+
+def search_pricing_data(product_type: str, industry: str = None) -> Dict:
+    """
+    Search for pricing information and models.
+
+    Args:
+        product_type: Type of product/service
+        industry: Industry context (optional)
+
+    Returns:
+        Dict with pricing data and models
+    """
+    query = f"{product_type} pricing plans cost"
+    if industry:
+        query = f"{industry} {product_type} pricing"
+
+    results = search_web(query, 10)
+
+    return {
+        "pricing_info": results.get("organic", []),
+        "answer_box": results.get("answerBox", {})
+    }
+
+
+def search_customer_pain_points(problem: str, industry: str = None) -> Dict:
+    """
+    Search for customer pain points and complaints.
+
+    Args:
+        problem: Problem statement or topic
+        industry: Industry context (optional)
+
+    Returns:
+        Dict with pain point data from forums, reviews, etc.
+    """
+    queries = [
+        f"{problem} challenges problems",
+        f"{problem} complaints issues reddit",
+        f"{problem} customer feedback reviews"
+    ]
+
+    if industry:
+        queries = [f"{industry} {q}" for q in queries]
+
+    results = {
+        "challenges": search_web(queries[0], 10),
+        "complaints": search_web(queries[1], 10),
+        "feedback": search_web(queries[2], 10)
+    }
+
+    return results
+
+
+def search_technology_stack(product_type: str) -> Dict:
+    """
+    Search for technology recommendations and stack info.
+
+    Args:
+        product_type: Type of product to build
+
+    Returns:
+        Dict with technology recommendations
+    """
+    queries = [
+        f"how to build {product_type} tech stack",
+        f"{product_type} architecture best practices",
+        f"{product_type} open source frameworks libraries"
+    ]
+
+    results = {
+        "tech_stack": search_web(queries[0], 10),
+        "architecture": search_web(queries[1], 10),
+        "frameworks": search_web(queries[2], 10)
+    }
+
+    return results
+
+
+def search_google_trends(keywords: List[str], timeframe: str = "today 12-m") -> Dict:
+    """
+    Search for Google Trends data on keywords.
+
+    Args:
+        keywords: List of keywords to analyze (max 5)
+        timeframe: Time range - "today 12-m", "today 3-m", "today 5-y"
+
+    Returns:
+        Dict with trends data including interest over time and related queries
+    """
+    results = {}
+
+    for keyword in keywords[:5]:  # Google Trends limits to 5 keywords
+        # Search for Google Trends data via web search
+        trends_query = f"Google Trends {keyword} interest over time"
+        trends_results = search_web(trends_query, 5)
+
+        # Search for related trending topics
+        related_query = f"{keyword} trending topics 2024 2025"
+        related_results = search_web(related_query, 5)
+
+        # Search for "rising" queries related to keyword
+        rising_query = f"{keyword} rising searches emerging trends"
+        rising_results = search_web(rising_query, 5)
+
+        results[keyword] = {
+            "trends_data": trends_results.get("organic", []),
+            "related_topics": related_results.get("organic", []),
+            "rising_queries": rising_results.get("organic", []),
+            "answer_box": trends_results.get("answerBox", {})
+        }
+
+    return results
+
+
+def search_google_trends_comparison(keywords: List[str]) -> Dict:
+    """
+    Compare multiple keywords on Google Trends.
+
+    Args:
+        keywords: List of keywords to compare (max 5)
+
+    Returns:
+        Dict with comparison data
+    """
+    keywords_str = " vs ".join(keywords[:5])
+    query = f"Google Trends {keywords_str} comparison"
+
+    results = search_web(query, 10)
+
+    return {
+        "comparison": results.get("organic", []),
+        "keywords": keywords[:5],
+        "answer_box": results.get("answerBox", {})
+    }
+
+
+def search_x_twitter(query: str, num_results: int = 20) -> Dict:
+    """
+    Search for X (Twitter) posts and discussions.
+
+    Uses X API if bearer token available, otherwise searches via web.
+
+    Args:
+        query: Search query
+        num_results: Number of results
+
+    Returns:
+        Dict with X/Twitter posts and engagement data
+    """
+    if X_BEARER_TOKEN:
+        # Use X API v2
+        return _search_x_api(query, num_results)
+    else:
+        # Fall back to web search for Twitter content
+        return _search_x_web(query, num_results)
+
+
+def _search_x_api(query: str, num_results: int = 20) -> Dict:
+    """
+    Search X using the official API.
+
+    Args:
+        query: Search query
+        num_results: Max results (10-100)
+
+    Returns:
+        Dict with tweets and metadata
+    """
+    headers = {
+        "Authorization": f"Bearer {X_BEARER_TOKEN}",
+        "Content-Type": "application/json"
+    }
+
+    # X API v2 recent search endpoint
+    url = "https://api.twitter.com/2/tweets/search/recent"
+    params = {
+        "query": query,
+        "max_results": min(num_results, 100),
+        "tweet.fields": "created_at,public_metrics,author_id,conversation_id",
+        "expansions": "author_id",
+        "user.fields": "name,username,verified,public_metrics"
+    }
+
+    try:
+        response = requests.get(url, headers=headers, params=params)
+        data = response.json()
+
+        tweets = data.get("data", [])
+        users = {u["id"]: u for u in data.get("includes", {}).get("users", [])}
+
+        # Enrich tweets with user data
+        enriched_tweets = []
+        for tweet in tweets:
+            author = users.get(tweet.get("author_id"), {})
+            enriched_tweets.append({
+                "text": tweet.get("text"),
+                "created_at": tweet.get("created_at"),
+                "metrics": tweet.get("public_metrics", {}),
+                "author": {
+                    "name": author.get("name"),
+                    "username": author.get("username"),
+                    "verified": author.get("verified", False),
+                    "followers": author.get("public_metrics", {}).get("followers_count", 0)
+                }
+            })
+
+        return {
+            "source": "x_api",
+            "tweets": enriched_tweets,
+            "result_count": len(enriched_tweets),
+            "query": query
+        }
+
+    except Exception as e:
+        return {"error": str(e), "source": "x_api"}
+
+
+def _search_x_web(query: str, num_results: int = 20) -> Dict:
+    """
+    Search for X/Twitter content via web search.
+
+    Args:
+        query: Search query
+        num_results: Number of results
+
+    Returns:
+        Dict with Twitter-related web results
+    """
+    # Search Twitter/X specific content
+    twitter_query = f"site:twitter.com OR site:x.com {query}"
+    twitter_results = search_web(twitter_query, num_results)
+
+    # Search for Twitter discussions about the topic
+    discussion_query = f"{query} twitter discussion thread"
+    discussion_results = search_web(discussion_query, 10)
+
+    # Search for viral tweets about the topic
+    viral_query = f"{query} viral tweet popular"
+    viral_results = search_web(viral_query, 10)
+
+    return {
+        "source": "web_search",
+        "twitter_posts": twitter_results.get("organic", []),
+        "discussions": discussion_results.get("organic", []),
+        "viral_content": viral_results.get("organic", []),
+        "query": query
+    }
+
+
+def search_social_sentiment(topic: str) -> Dict:
+    """
+    Search for social media sentiment and discussions about a topic.
+
+    Args:
+        topic: Topic to analyze
+
+    Returns:
+        Dict with sentiment indicators from X, Reddit, and other sources
+    """
+    # X/Twitter sentiment
+    x_results = search_x_twitter(f"{topic} -filter:retweets", 20)
+
+    # Reddit discussions
+    reddit_query = f"site:reddit.com {topic}"
+    reddit_results = search_web(reddit_query, 15)
+
+    # General social buzz
+    social_query = f"{topic} social media reaction opinions"
+    social_results = search_web(social_query, 10)
+
+    # News sentiment
+    news_query = f"{topic} news reaction response"
+    news_results = search_web(news_query, 10)
+
+    return {
+        "x_twitter": x_results,
+        "reddit": reddit_results.get("organic", []),
+        "social_buzz": social_results.get("organic", []),
+        "news_sentiment": news_results.get("organic", []),
+        "topic": topic
+    }
+
+
+def search_market_signals(industry: str, keywords: List[str] = None) -> Dict:
+    """
+    Comprehensive market signal search combining trends, social, and news.
+
+    Args:
+        industry: Industry to research
+        keywords: Additional keywords
+
+    Returns:
+        Dict with comprehensive market signals
+    """
+    all_keywords = [industry] + (keywords or [])
+
+    return {
+        "google_trends": search_google_trends(all_keywords[:3]),
+        "social_sentiment": search_social_sentiment(industry),
+        "market_data": search_market_data(industry, keywords),
+        "timestamp": datetime.now().isoformat()
+    }
+
+
+if __name__ == "__main__":
+    # Test the functions
+    print("Testing web research functions...")
+
+    # Example: Search for AI cost management market
+    market_data = search_market_data("AI cost management", ["enterprise", "FinOps"])
+    print(f"Found {len(market_data.get('market_size', {}).get('organic', []))} market size results")
+
+    # Test Google Trends
+    print("\nTesting Google Trends search...")
+    trends = search_google_trends(["AI coding assistant", "developer productivity"])
+    print(f"Found trends data for {len(trends)} keywords")
+
+    # Test X/Twitter search
+    print("\nTesting X/Twitter search...")
+    x_results = search_x_twitter("AI developer tools")
+    print(f"Source: {x_results.get('source')}")
+    print(f"Found {len(x_results.get('twitter_posts', x_results.get('tweets', [])))} results")
