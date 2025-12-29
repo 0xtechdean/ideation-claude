@@ -4,109 +4,54 @@ Multi-agent startup problem validator using Claude Code.
 
 ## Architecture
 
-```mermaid
-graph TB
-    subgraph "Slack Interface"
-        SLACK[/ideation evaluate]
-    end
-
-    subgraph "Orchestration Layer"
-        ORCH[Ideation Orchestrator]
-    end
-
-    subgraph "Evaluation Pipeline"
-        PHASE1[Phase 1: Market Research]
-        PHASE2[Phase 2: Competitive Analysis]
-        PHASE3[Phase 3: Market Sizing]
-        PHASE4[Phase 4: Technical Feasibility]
-        PHASE5[Phase 5: Lean Startup]
-        PHASE6[Phase 6: Mom Test]
-        PHASE7[Phase 7: Scoring]
-        PHASE8[Phase 8: Pivot Suggestions]
-    end
-
-    subgraph "Agents"
-        AGENT1[Market Research Agent]
-        AGENT2[Competitive Analysis Agent]
-        AGENT3[Market Sizing Agent]
-        AGENT4[Technical Feasibility Agent]
-        AGENT5[Lean Startup Agent]
-        AGENT6[Mom Test Agent]
-        AGENT7[Scoring Agent]
-        AGENT8[Pivot Agent]
-    end
-
-    subgraph "Memory & Context"
-        MEM0[Mem0 Memory Service]
-        CONTEXT[Past Evaluations<br/>Phase Outputs<br/>Market Insights]
-    end
-
-    SLACK --> ORCH
-    ORCH --> PHASE1
-    ORCH --> PHASE2
-    ORCH --> PHASE3
-    ORCH --> PHASE4
-    ORCH --> PHASE5
-    ORCH --> PHASE6
-    ORCH --> PHASE7
-    ORCH --> PHASE8
-
-    PHASE1 --> AGENT1
-    PHASE2 --> AGENT2
-    PHASE3 --> AGENT3
-    PHASE4 --> AGENT4
-    PHASE5 --> AGENT5
-    PHASE6 --> AGENT6
-    PHASE7 --> AGENT7
-    PHASE8 --> AGENT8
-
-    AGENT1 --> MEM0
-    AGENT2 --> MEM0
-    AGENT3 --> MEM0
-    AGENT4 --> MEM0
-    AGENT5 --> MEM0
-    AGENT6 --> MEM0
-    AGENT7 --> MEM0
-    AGENT8 --> MEM0
-
-    MEM0 --> CONTEXT
-    CONTEXT --> AGENT1
-    CONTEXT --> AGENT2
-    CONTEXT --> AGENT3
-    CONTEXT --> AGENT4
-    CONTEXT --> AGENT5
-    CONTEXT --> AGENT6
-    CONTEXT --> AGENT7
-    CONTEXT --> AGENT8
-
-    style SLACK fill:#e1f5ff
-    style ORCH fill:#fff4e1
-    style MEM0 fill:#e8f5e9
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     Cursor Slack App                             │
+│              /ideation evaluate "problem"                        │
+└─────────────────────────────┬───────────────────────────────────┘
+                              │ webhook + repo URL
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      claude.ai/code                              │
+│  Opens repo URL → Reads CLAUDE.md → Executes agent logic         │
+│  (Runs sequentially: researcher → market-analyst → ... )        │
+└─────────────────────────────┬───────────────────────────────────┘
+                              │ read/write
+                              ▼
+                    ┌───────────────────┐
+                    │       Mem0        │
+                    │  (Shared Context) │
+                    └───────────────────┘
 ```
 
 ## How It Works
 
 1. User in Slack: `/ideation evaluate "Legal research is too expensive"`
-2. Slack App triggers claude.ai/code with orchestrator repo
-3. Orchestrator runs 8 phases sequentially
-4. Each agent reads previous context from Mem0
-5. Each agent writes its output to Mem0
-6. Scoring agent determines pass/eliminate
-7. If eliminated, Pivot agent suggests alternatives
-8. Final evaluation posted back to Slack
+2. Cursor Slack App receives the command
+3. Slack App triggers [claude.ai/code](https://claude.ai/code) with:
+   - Repo URL: `github.com/Othentic-Ai/ideation-agent-researcher`
+   - Prompt: session_id + problem statement
+4. claude.ai/code opens the repo, reads `CLAUDE.md`, executes
+5. Agent writes results to Mem0 under session_id
+6. Slack App triggers next agent (market-analyst)
+7. Repeat for all 9 agents
+8. Final report posted back to Slack
 
 ## Agent Repositories
 
-| Phase | Agent | Repository |
-|-------|-------|------------|
-| 1 | Market Research | [ideation-agent-market-research](https://github.com/Othentic-Ai/ideation-agent-market-research) |
-| 2 | Competitive Analysis | [ideation-agent-competitive-analysis](https://github.com/Othentic-Ai/ideation-agent-competitive-analysis) |
-| 3 | Market Sizing | [ideation-agent-market-sizing](https://github.com/Othentic-Ai/ideation-agent-market-sizing) |
-| 4 | Technical Feasibility | [ideation-agent-technical-feasibility](https://github.com/Othentic-Ai/ideation-agent-technical-feasibility) |
-| 5 | Lean Startup | [ideation-agent-lean-startup](https://github.com/Othentic-Ai/ideation-agent-lean-startup) |
-| 6 | Mom Test | [ideation-agent-mom-test](https://github.com/Othentic-Ai/ideation-agent-mom-test) |
-| 7 | Scoring | [ideation-agent-scoring](https://github.com/Othentic-Ai/ideation-agent-scoring) |
-| 8 | Pivot | [ideation-agent-pivot](https://github.com/Othentic-Ai/ideation-agent-pivot) |
+Each agent is a minimal repo with just `CLAUDE.md` + `README.md`:
+
+| Agent | Repository | Role |
+|-------|------------|------|
+| Researcher | [ideation-agent-researcher](https://github.com/Othentic-Ai/ideation-agent-researcher) | Market trends & pain points |
+| Market Analyst | [ideation-agent-market-analyst](https://github.com/Othentic-Ai/ideation-agent-market-analyst) | TAM/SAM/SOM calculations |
+| Customer Discovery | [ideation-agent-customer-discovery](https://github.com/Othentic-Ai/ideation-agent-customer-discovery) | Mom Test interview framework |
+| Scoring Evaluator | [ideation-agent-scoring-evaluator](https://github.com/Othentic-Ai/ideation-agent-scoring-evaluator) | 8-criteria opportunity scoring |
+| Competitor Analyst | [ideation-agent-competitor-analyst](https://github.com/Othentic-Ai/ideation-agent-competitor-analyst) | Competitive landscape analysis |
+| Resource Scout | [ideation-agent-resource-scout](https://github.com/Othentic-Ai/ideation-agent-resource-scout) | Technical feasibility & resources |
+| Hypothesis Architect | [ideation-agent-hypothesis-architect](https://github.com/Othentic-Ai/ideation-agent-hypothesis-architect) | Lean Startup framework & MVP |
+| Pivot Advisor | [ideation-agent-pivot-advisor](https://github.com/Othentic-Ai/ideation-agent-pivot-advisor) | Strategic alternatives |
+| Report Generator | [ideation-agent-report-generator](https://github.com/Othentic-Ai/ideation-agent-report-generator) | Final evaluation report |
 
 ### Agent Repo Structure
 
@@ -121,26 +66,30 @@ No Python packages, no GitHub Actions - just instructions for Claude Code.
 ## Evaluation Pipeline
 
 ```
-Phase 1: Market Research
-    ↓
-Phase 2: Competitive Analysis
-    ↓
-Phase 3: Market Sizing (TAM/SAM/SOM)
-    ↓
-Phase 4: Technical Feasibility
-    ↓
-Phase 5: Lean Startup (MVP)
-    ↓
-Phase 6: Mom Test (Customer Discovery)
-    ↓
-Phase 7: Scoring
-    │
-    ├── Score < 5.0 → ELIMINATE → Phase 8: Pivot
-    │
-    └── Score >= 5.0 → PASSED
+PROBLEM VALIDATION PHASE
+├── 1. Researcher Agent (trends & pain points)
+├── 2. Market Analyst Agent (TAM/SAM/SOM)
+├── 3. Customer Discovery Agent (Mom Test)
+└── 4. Scoring Evaluator Agent (problem score)
+        │
+        ├── Score < Threshold? → ELIMINATE → Pivot Advisor → Report
+        │
+        └── Score ≥ Threshold? → Continue ↓
+
+SOLUTION VALIDATION PHASE
+├── 5. Competitor Analyst Agent (landscape)
+├── 6. Resource Scout Agent (feasibility)
+├── 7. Hypothesis Architect Agent (MVP)
+└── 8. Scoring Evaluator Agent (solution score)
+        │
+        └── Combined Score (60% problem + 40% solution)
+                │
+                └── Report Generator Agent
 ```
 
 ## Usage
+
+### Via Cursor Slack App
 
 ```bash
 /ideation evaluate "Legal research is too time-consuming and expensive"
@@ -162,21 +111,26 @@ Each agent reads/writes to Mem0 using the session_id:
   "problem": "Legal research is too time-consuming",
   "threshold": 5.0,
   "phases": {
-    "market_research": { "status": "complete", "output": "..." },
-    "competitive_analysis": { "status": "pending" }
+    "researcher": { "status": "complete", "output": "..." },
+    "market_analyst": { "status": "pending" }
   },
-  "score": null,
-  "eliminated": false
+  "scores": {
+    "problem": 7.2,
+    "solution": null,
+    "combined": null
+  }
 }
 ```
 
 ## Features
 
-- **8-Phase Pipeline**: Comprehensive evaluation from research to scoring
-- **Early Elimination**: Stops at scoring if score < 5.0
+- **Problem-First Validation**: Validates the problem before evaluating the solution
+- **Early Elimination**: Stops immediately if problem validation fails
 - **Minimal Agent Repos**: Just CLAUDE.md instructions - no code needed
 - **claude.ai/code Execution**: Slack webhook triggers Claude Code directly
 - **Mem0 Context**: Shared session state across all agents
+- **Two-Phase Pipeline**: Problem validation → Solution validation
+- **Weighted Scoring**: 60% problem + 40% solution
 - **Pivot Suggestions**: Strategic alternatives for eliminated problems
 
 ## License
