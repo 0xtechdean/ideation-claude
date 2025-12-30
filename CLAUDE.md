@@ -195,18 +195,19 @@ The report should include all sections:
 
 Use the **Write tool** to save the report file.
 
-### Phase 5: Send Report to Slack
+### Phase 5: Send FULL Report to Slack
 
-After saving the report, **send a summary to Slack** using the Slack Bot Token:
+After saving the report, **ALWAYS send both a summary AND the full report to Slack**:
 
+#### Step 1: Send Summary Message
 ```python
 import os
 import requests
 
-def send_to_slack(session_id, problem, score, verdict, tam, som, segment, gap, report_path, next_steps):
+def send_summary_to_slack(session_id, problem, score, verdict, tam, som, segment, gap, report_path, next_steps):
     """Send evaluation summary to Slack."""
     bot_token = os.environ["SLACK_BOT_TOKEN"]
-    channel_id = os.environ["SLACK_CHANNEL_ID"]
+    channel_id = os.environ.get("SLACK_CHANNEL_ID", "C0A5GGQ250F")
 
     status_emoji = "✅" if verdict == "PASS" else "❌"
 
@@ -229,7 +230,7 @@ def send_to_slack(session_id, problem, score, verdict, tam, som, segment, gap, r
         {"type": "section", "text": {"type": "mrkdwn", "text": f"*Key Gap:* {gap}"}},
         {"type": "divider"},
         {"type": "section", "text": {"type": "mrkdwn", "text": "*Next Steps:*\n" + "\n".join([f"• {s}" for s in next_steps[:4]])}},
-        {"type": "context", "elements": [{"type": "mrkdwn", "text": f"📄 Full report: `{report_path}`"}]}
+        {"type": "context", "elements": [{"type": "mrkdwn", "text": f"📄 Full report attached below"}]}
     ]
 
     requests.post(
@@ -238,6 +239,37 @@ def send_to_slack(session_id, problem, score, verdict, tam, som, segment, gap, r
         json={"channel": channel_id, "text": f"Evaluation Complete: {verdict} ({score}/10)", "blocks": blocks}
     )
 ```
+
+#### Step 2: Upload FULL Report as File
+```python
+def upload_full_report_to_slack(report_path, session_id, problem):
+    """Upload the full report markdown file to Slack."""
+    bot_token = os.environ["SLACK_BOT_TOKEN"]
+    channel_id = os.environ.get("SLACK_CHANNEL_ID", "C0A5GGQ250F")
+
+    with open(report_path, 'r') as f:
+        report_content = f.read()
+
+    # Upload file to Slack
+    response = requests.post(
+        "https://slack.com/api/files.upload",
+        headers={"Authorization": f"Bearer {bot_token}"},
+        data={
+            "channels": channel_id,
+            "content": report_content,
+            "filename": f"evaluation-report-{session_id}.md",
+            "filetype": "markdown",
+            "title": f"Full Evaluation Report: {problem[:50]}...",
+            "initial_comment": f"📋 Full evaluation report for session `{session_id}`"
+        }
+    )
+    return response.json()
+```
+
+**IMPORTANT**: You MUST always:
+1. Save the report to `./reports/{name}-{session_id}.md`
+2. Send summary message to Slack
+3. Upload the full report file to Slack
 
 Or use the helper script: `scripts/slack_helpers.py`
 
@@ -266,9 +298,10 @@ Or use the helper script: `scripts/slack_helpers.py`
 **Phase 4: Save Report**
 12. [ ] Save full report to `reports/{name}-{session_id}.md`
 
-**Phase 5: Send to Slack**
+**Phase 5: Send to Slack (ALWAYS DO THIS)**
 13. [ ] Send formatted summary to Slack channel
-14. [ ] Present summary and file location to user
+14. [ ] Upload FULL report markdown file to Slack
+15. [ ] Present summary and file location to user
 
 **Expected Time**:
 - Full flow (problem passes): ~10-12 minutes
