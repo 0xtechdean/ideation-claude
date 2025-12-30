@@ -3,7 +3,7 @@ Analysis Tools for Ideation Agents
 Reusable functions for market analysis, scoring, and competitive analysis
 """
 
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 from dataclasses import dataclass
 from enum import Enum
 
@@ -115,18 +115,122 @@ def calculate_combined_score(problem_score: float, solution_score: float) -> flo
     return (problem_score * 0.6) + (solution_score * 0.4)
 
 
-def evaluate_score_decision(score: float, threshold: float = 5.0) -> str:
+def evaluate_score_decision(score: float, threshold: float = 6.0) -> str:
     """
     Determine pass/fail decision based on score.
 
     Args:
         score: Score to evaluate
-        threshold: Passing threshold (default 5.0)
+        threshold: Passing threshold (default 6.0)
 
     Returns:
         'pass' or 'fail' string
     """
     return "pass" if score >= threshold else "fail"
+
+
+def validate_single_score(score: Union[int, float, None], criterion: str = "") -> Tuple[float, Optional[str]]:
+    """
+    Validate a single score is in 1-10 range.
+
+    Args:
+        score: Score to validate (can be None)
+        criterion: Name of criterion (for error messages)
+
+    Returns:
+        Tuple of (validated_score, warning_message or None)
+    """
+    if score is None:
+        return 5.0, f"Missing score for {criterion}, defaulting to 5.0"
+
+    if not isinstance(score, (int, float)):
+        return 5.0, f"Invalid type for {criterion} score: {type(score)}, defaulting to 5.0"
+
+    if score < 1:
+        return 1.0, f"{criterion} score {score} below minimum, clamped to 1"
+    if score > 10:
+        return 10.0, f"{criterion} score {score} above maximum, clamped to 10"
+
+    return float(score), None
+
+
+def validate_scores(scores: Dict[str, Union[float, None]]) -> Tuple[Dict[str, float], List[str]]:
+    """
+    Validate all scores are in 1-10 range.
+
+    Args:
+        scores: Dict of criterion -> score
+
+    Returns:
+        Tuple of (validated_scores, warnings)
+    """
+    validated = {}
+    warnings = []
+
+    for criterion, score in scores.items():
+        valid_score, warning = validate_single_score(score, criterion)
+        validated[criterion] = valid_score
+        if warning:
+            warnings.append(warning)
+
+    return validated, warnings
+
+
+def calculate_problem_score(scores: Dict[str, float]) -> Tuple[float, Dict[str, float]]:
+    """
+    Calculate the problem validation score from component scores.
+
+    Args:
+        scores: Dict with keys: problem_severity, market_size, willingness_to_pay, solution_fit
+
+    Returns:
+        Tuple of (final_score, weighted_breakdown)
+    """
+    weights = {
+        "problem_severity": 0.25,
+        "market_size": 0.25,
+        "willingness_to_pay": 0.25,
+        "solution_fit": 0.25
+    }
+
+    # Validate scores first
+    validated, warnings = validate_scores(scores)
+    for warning in warnings:
+        print(f"Warning: {warning}")
+
+    # Calculate weighted score
+    weighted = {}
+    total = 0.0
+
+    for criterion, weight in weights.items():
+        score = validated.get(criterion, 5.0)
+        weighted[criterion] = score * weight
+        total += weighted[criterion]
+
+    return total, weighted
+
+
+def calculate_solution_score(scores: Dict[str, float]) -> float:
+    """
+    Calculate the solution validation score from component scores.
+
+    Args:
+        scores: Dict with keys: technical_viability, competitive_advantage,
+                               resource_requirements, time_to_market
+
+    Returns:
+        Average of the 4 solution criteria
+    """
+    # Validate scores first
+    validated, warnings = validate_scores(scores)
+    for warning in warnings:
+        print(f"Warning: {warning}")
+
+    criteria = ["technical_viability", "competitive_advantage",
+                "resource_requirements", "time_to_market"]
+
+    total = sum(validated.get(c, 5.0) for c in criteria)
+    return total / len(criteria)
 
 
 @dataclass
@@ -365,19 +469,28 @@ if __name__ == "__main__":
     print(f"SAM: {format_market_size(market.sam)}")
     print(f"SOM: {format_market_size(market.som)}")
 
-    # Test scoring
+    # Test scoring with validation
     scores = {
         "problem_severity": 8,
         "market_size": 7,
         "willingness_to_pay": 6,
         "solution_fit": 7
     }
-    weights = {
-        "problem_severity": 0.25,
-        "market_size": 0.25,
-        "willingness_to_pay": 0.25,
-        "solution_fit": 0.25
+
+    # Test problem score calculation
+    problem_score, breakdown = calculate_problem_score(scores)
+    print(f"\nProblem Score: {problem_score}")
+    print(f"Breakdown: {breakdown}")
+    print(f"Decision (threshold 6.0): {evaluate_score_decision(problem_score)}")
+
+    # Test score validation with edge cases
+    print("\nTesting score validation...")
+    edge_cases = {
+        "normal": 7,
+        "too_low": -1,
+        "too_high": 15,
+        "missing": None
     }
-    final_score, breakdown = score_criteria(scores, weights)
-    print(f"Final Score: {final_score}")
-    print(f"Decision: {evaluate_score_decision(final_score)}")
+    validated, warnings = validate_scores(edge_cases)
+    print(f"Validated: {validated}")
+    print(f"Warnings: {warnings}")

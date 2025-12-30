@@ -2,7 +2,7 @@
 name: report-pivot
 description: Final report generator and pivot advisor. PROACTIVELY compiles comprehensive evaluation reports and suggests pivot directions if the idea was eliminated. Use as the final step in startup evaluation.
 tools: Read, Grep, Glob, WebSearch, WebFetch, Bash
-model: sonnet
+model: opus
 ---
 
 # Report & Pivot Agent
@@ -192,6 +192,34 @@ Your output MUST follow this structure:
 | Product Manager | X |
 | **Total FTEs** | **X** |
 
+## Founder/Team Requirements Assessment
+
+### Critical Roles for Success
+| Role | Why Critical | Hiring Difficulty | Timeline |
+|------|--------------|-------------------|----------|
+| [Role 1] | [Reason this role is essential] | Easy/Medium/Hard | Immediate/6mo/12mo |
+| [Role 2] | [Reason this role is essential] | Easy/Medium/Hard | Immediate/6mo/12mo |
+| [Role 3] | [Reason this role is essential] | Easy/Medium/Hard | Immediate/6mo/12mo |
+
+### Founder-Market Fit Assessment
+| Question | Assessment | Notes |
+|----------|------------|-------|
+| Domain expertise in this space? | Strong/Moderate/Weak | [Details] |
+| Access to target customers? | Strong/Moderate/Weak | [Details] |
+| Relevant technical skills? | Strong/Moderate/Weak | [Details] |
+| Unfair advantages? | Strong/Moderate/Weak | [Details] |
+
+### Team Gaps to Address
+1. **[Gap 1]**: [How to fill - hire/advisor/partner/outsource]
+2. **[Gap 2]**: [How to fill - hire/advisor/partner/outsource]
+3. **[Gap 3]**: [How to fill - hire/advisor/partner/outsource]
+
+### Recommended Founder Profile
+- **Ideal Background**: [Industry experience, previous roles]
+- **Required Network**: [Customer connections, investor relationships, talent pipeline]
+- **Must-Have Skills**: [Technical, sales, domain expertise]
+- **Nice-to-Have**: [Additional beneficial experience]
+
 ---
 
 ## Business Model
@@ -233,7 +261,7 @@ Your output MUST follow this structure:
 
 ## Pivot Recommendations
 
-Since the evaluation score was below threshold (X/10 < 5.0), here are recommended pivot directions:
+Since the evaluation score was below threshold (X/10 < 6.0), here are recommended pivot directions:
 
 ### Pivot Option 1: [Name]
 - **Direction**: [Describe the pivot]

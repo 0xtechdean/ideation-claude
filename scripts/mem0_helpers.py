@@ -4,8 +4,11 @@ Streamlined operations for reading/writing session context
 """
 
 import os
+import re
 import time
-from typing import Dict, List, Optional, Any
+import hashlib
+from datetime import datetime
+from typing import Dict, List, Optional, Any, Tuple
 from mem0 import MemoryClient
 
 MEM0_API_KEY = os.environ.get("MEM0_API_KEY")
@@ -201,7 +204,7 @@ def wait_for_phase(
     timeout: int = 300,
     poll_interval: int = 10,
     api_key: str = None
-) -> bool:
+) -> Tuple[bool, str]:
     """
     Wait for an agent to complete its phase.
 
@@ -219,10 +222,10 @@ def wait_for_phase(
 
     while time.time() - start_time < timeout:
         if check_phase_complete(session_id, agent_name, api_key):
-            return True
+            return True, ""
         time.sleep(poll_interval)
 
-    return False
+    return False, f"Timeout waiting for {agent_name} after {timeout}s"
 
 
 def wait_for_agents(
@@ -343,6 +346,246 @@ def write_score(
     return True
 
 
+def validate_score(score: float, criterion: str = "") -> float:
+    """
+    Validate score is in 1-10 range.
+
+    Args:
+        score: Score to validate
+        criterion: Name of criterion (for error messages)
+
+    Returns:
+        Validated score clamped to 1-10 range
+
+    Raises:
+        ValueError if score is not a number
+    """
+    if not isinstance(score, (int, float)):
+        raise ValueError(f"Score for {criterion} must be a number, got {type(score)}")
+
+    if score < 1:
+        print(f"Warning: {criterion} score {score} below minimum, clamping to 1")
+        return 1.0
+    if score > 10:
+        print(f"Warning: {criterion} score {score} above maximum, clamping to 10")
+        return 10.0
+
+    return float(score)
+
+
+def get_problem_scores(session_id: str, api_key: str = None) -> Dict[str, Optional[float]]:
+    """
+    Extract all problem validation scores from a session.
+
+    Args:
+        session_id: Session identifier
+        api_key: Optional Mem0 API key
+
+    Returns:
+        Dict with keys: problem_severity, market_size, willingness_to_pay, solution_fit
+    """
+    client = get_client(api_key)
+    scores = {
+        "problem_severity": None,
+        "market_size": None,
+        "willingness_to_pay": None,
+        "solution_fit": None
+    }
+
+    # Search customer-solution agent for scores
+    customer_user_id = get_user_id("customer_solution", session_id)
+    customer_results = client.search(
+        "score",
+        filters={"user_id": customer_user_id},
+        limit=20
+    )
+
+    if isinstance(customer_results, dict):
+        customer_results = customer_results.get("results", [])
+
+    for result in customer_results:
+        memory = result.get("memory", "").lower()
+        metadata = result.get("metadata", {})
+
+        # Check for solution fit score
+        if metadata.get("type") == "solution_fit_score":
+            scores["solution_fit"] = metadata.get("score")
+        elif "solution fit" in memory:
+            # Try to extract score from memory text
+            match = re.search(r"(\d+(?:\.\d+)?)/10", memory)
+            if match:
+                scores["solution_fit"] = float(match.group(1))
+
+    # Search market-researcher agent for market_size
+    market_user_id = get_user_id("market_researcher", session_id)
+    market_results = client.search(
+        "market size score",
+        filters={"user_id": market_user_id},
+        limit=10
+    )
+
+    if isinstance(market_results, dict):
+        market_results = market_results.get("results", [])
+
+    for result in market_results:
+        memory = result.get("memory", "").lower()
+        if "market size" in memory:
+            match = re.search(r"(\d+(?:\.\d+)?)/10", memory)
+            if match:
+                scores["market_size"] = float(match.group(1))
+
+    return scores
+
+
+def get_solution_scores(session_id: str, api_key: str = None) -> Dict[str, Optional[float]]:
+    """
+    Extract solution validation scores from feasibility-scorer.
+
+    Args:
+        session_id: Session identifier
+        api_key: Optional Mem0 API key
+
+    Returns:
+        Dict with keys: technical_viability, competitive_advantage,
+                       resource_requirements, time_to_market
+    """
+    client = get_client(api_key)
+    user_id = get_user_id("feasibility_scorer", session_id)
+
+    results = client.search(
+        "score",
+        filters={"user_id": user_id},
+        limit=20
+    )
+
+    if isinstance(results, dict):
+        results = results.get("results", [])
+
+    scores = {
+        "technical_viability": None,
+        "competitive_advantage": None,
+        "resource_requirements": None,
+        "time_to_market": None
+    }
+
+    for result in results:
+        memory = result.get("memory", "").lower()
+        metadata = result.get("metadata", {})
+
+        # Check metadata for scoring_decision
+        if metadata.get("type") == "scoring_decision":
+            if metadata.get("solution_score"):
+                # If we have a combined solution score, use it
+                pass
+
+        # Try to extract individual scores from memory text
+        for criterion in scores.keys():
+            criterion_text = criterion.replace("_", " ")
+            if criterion_text in memory:
+                match = re.search(r"(\d+(?:\.\d+)?)/10", memory)
+                if match and scores[criterion] is None:
+                    scores[criterion] = float(match.group(1))
+
+    return scores
+
+
+def cache_research(
+    session_id: str,
+    research_type: str,
+    query: str,
+    results: Dict,
+    ttl_hours: int = 24,
+    api_key: str = None
+) -> bool:
+    """
+    Cache research results in Mem0 to avoid duplicate searches.
+
+    Args:
+        session_id: Session identifier
+        research_type: Type of research (e.g., 'web_search', 'competitor')
+        query: Search query that was executed
+        results: Results to cache
+        ttl_hours: Time-to-live in hours (default 24)
+        api_key: Optional Mem0 API key
+
+    Returns:
+        True if cache write successful
+    """
+    client = get_client(api_key)
+    user_id = get_user_id("cache", session_id)
+
+    cache_key = hashlib.md5(f"{research_type}:{query}".encode()).hexdigest()
+
+    client.add(
+        f"Cached {research_type}: {query[:100]}",
+        user_id=user_id,
+        metadata={
+            "type": "research_cache",
+            "cache_key": cache_key,
+            "research_type": research_type,
+            "query": query,
+            "results": results,
+            "cached_at": datetime.now().isoformat(),
+            "ttl_hours": ttl_hours
+        }
+    )
+    return True
+
+
+def _is_cache_expired(result: Dict, default_ttl_hours: int = 24) -> bool:
+    """Check if a cached result has expired."""
+    metadata = result.get("metadata", {})
+    cached_at = metadata.get("cached_at")
+    ttl_hours = metadata.get("ttl_hours", default_ttl_hours)
+
+    if not cached_at:
+        return True
+
+    try:
+        cached_time = datetime.fromisoformat(cached_at)
+        age_hours = (datetime.now() - cached_time).total_seconds() / 3600
+        return age_hours > ttl_hours
+    except (ValueError, TypeError):
+        return True
+
+
+def get_cached_research(
+    session_id: str,
+    research_type: str,
+    query: str,
+    api_key: str = None
+) -> Optional[Dict]:
+    """
+    Retrieve cached research if available and not expired.
+
+    Args:
+        session_id: Session identifier
+        research_type: Type of research
+        query: Search query
+        api_key: Optional Mem0 API key
+
+    Returns:
+        Cached results if available and not expired, None otherwise
+    """
+    client = get_client(api_key)
+    user_id = get_user_id("cache", session_id)
+
+    cache_key = hashlib.md5(f"{research_type}:{query}".encode()).hexdigest()
+
+    results = client.search(
+        cache_key,
+        filters={"user_id": user_id},
+        limit=1
+    )
+
+    if isinstance(results, dict):
+        results = results.get("results", [])
+
+    if results and not _is_cache_expired(results[0]):
+        return results[0].get("metadata", {}).get("results")
+    return None
+
+
 if __name__ == "__main__":
     # Test the functions
     print("Testing Mem0 helper functions...")
@@ -355,3 +598,8 @@ if __name__ == "__main__":
     print("- wait_for_agents()")
     print("- get_score()")
     print("- write_score()")
+    print("- validate_score()")
+    print("- get_problem_scores()")
+    print("- get_solution_scores()")
+    print("- cache_research()")
+    print("- get_cached_research()")

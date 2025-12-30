@@ -14,18 +14,26 @@ SERPER_BASE_URL = "https://google.serper.dev"
 # Optional: X (Twitter) API credentials
 X_BEARER_TOKEN = os.environ.get("X_BEARER_TOKEN")
 
+# Default timeout for HTTP requests (seconds)
+DEFAULT_TIMEOUT = 30
 
-def search_web(query: str, num_results: int = 10) -> Dict:
+
+def search_web(query: str, num_results: int = 10, timeout: int = DEFAULT_TIMEOUT) -> Dict:
     """
-    Perform a web search using Serper API.
+    Perform a web search using Serper API with timeout and error handling.
 
     Args:
         query: Search query string
         num_results: Number of results to return (default 10)
+        timeout: Request timeout in seconds (default 30)
 
     Returns:
         Dict with search results including organic results, knowledge graph, etc.
+        On error, returns dict with "error" key and empty "organic" list.
     """
+    if not SERPER_API_KEY:
+        return {"error": "SERPER_API_KEY not configured", "organic": []}
+
     headers = {
         "X-API-KEY": SERPER_API_KEY,
         "Content-Type": "application/json"
@@ -36,13 +44,21 @@ def search_web(query: str, num_results: int = 10) -> Dict:
         "num": num_results
     }
 
-    response = requests.post(
-        f"{SERPER_BASE_URL}/search",
-        headers=headers,
-        json=payload
-    )
-
-    return response.json()
+    try:
+        response = requests.post(
+            f"{SERPER_BASE_URL}/search",
+            headers=headers,
+            json=payload,
+            timeout=timeout
+        )
+        response.raise_for_status()
+        return response.json()
+    except requests.Timeout:
+        return {"error": f"Search timed out after {timeout}s", "organic": []}
+    except requests.HTTPError as e:
+        return {"error": f"HTTP error: {e.response.status_code}", "organic": []}
+    except requests.RequestException as e:
+        return {"error": f"Request failed: {str(e)}", "organic": []}
 
 
 def search_market_data(industry: str, keywords: List[str] = None) -> Dict:
@@ -258,13 +274,14 @@ def search_x_twitter(query: str, num_results: int = 20) -> Dict:
         return _search_x_web(query, num_results)
 
 
-def _search_x_api(query: str, num_results: int = 20) -> Dict:
+def _search_x_api(query: str, num_results: int = 20, timeout: int = DEFAULT_TIMEOUT) -> Dict:
     """
-    Search X using the official API.
+    Search X using the official API with timeout and error handling.
 
     Args:
         query: Search query
         num_results: Max results (10-100)
+        timeout: Request timeout in seconds (default 30)
 
     Returns:
         Dict with tweets and metadata
@@ -285,7 +302,8 @@ def _search_x_api(query: str, num_results: int = 20) -> Dict:
     }
 
     try:
-        response = requests.get(url, headers=headers, params=params)
+        response = requests.get(url, headers=headers, params=params, timeout=timeout)
+        response.raise_for_status()
         data = response.json()
 
         tweets = data.get("data", [])
@@ -314,8 +332,12 @@ def _search_x_api(query: str, num_results: int = 20) -> Dict:
             "query": query
         }
 
-    except Exception as e:
-        return {"error": str(e), "source": "x_api"}
+    except requests.Timeout:
+        return {"error": f"X API timed out after {timeout}s", "source": "x_api", "tweets": []}
+    except requests.HTTPError as e:
+        return {"error": f"X API HTTP error: {e.response.status_code}", "source": "x_api", "tweets": []}
+    except requests.RequestException as e:
+        return {"error": f"X API request failed: {str(e)}", "source": "x_api", "tweets": []}
 
 
 def _search_x_web(query: str, num_results: int = 20) -> Dict:

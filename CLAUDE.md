@@ -16,7 +16,7 @@ Orchestrator (you)
 │           ↓                                 │
 │  Score Problem: severity, market, WTP       │
 │           ↓                                 │
-│  problem_score < 5.0? ──► ELIMINATE ──────────┐
+│  problem_score < 6.0? ──► ELIMINATE ──────────┐
 └─────────────────────────────────────────────┘ │
     ↓ (if passes)                               │
 ┌─────────────────────────────────────────────┐ │
@@ -47,7 +47,7 @@ Orchestrator (you)
 
 **Two-Phase Validation**: Problem validation MUST pass before solution validation runs!
 
-**Early Elimination**: If problem_score < 5.0, skip solution phase and go directly to report with pivot suggestions.
+**Early Elimination**: If problem_score < 6.0, skip solution phase and go directly to report with pivot suggestions.
 
 ## How You Are Triggered
 
@@ -88,7 +88,7 @@ client.add(
         "type": "session_init",
         "session_id": session_id,
         "problem": problem,
-        "threshold": 5.0,
+        "threshold": 6.0,
         "status": "started"
     }
 )
@@ -122,7 +122,7 @@ problem_score = (severity + market_size + wtp + solution_fit) / 4
 ### DECISION POINT: Early Elimination
 
 ```python
-if problem_score < 5.0:
+if problem_score < 6.0:
     # ELIMINATE - Skip solution validation
     # Go directly to report-pivot with pivot suggestions
     decision = "fail"
@@ -134,7 +134,7 @@ else:
 
 ### Phase 2: SOLUTION VALIDATION (Only if problem passes!)
 
-**ONLY RUN IF problem_score >= 5.0**
+**ONLY RUN IF problem_score >= 6.0**
 
 ```
 Task 3: feasibility-scorer
@@ -150,7 +150,7 @@ Task 3: feasibility-scorer
 # Combined = (Problem × 60%) + (Solution × 40%)
 combined_score = (problem_score * 0.6) + (solution_score * 0.4)
 
-if combined_score >= 5.0:
+if combined_score >= 6.0:
     verdict = "PASS"
 else:
     verdict = "FAIL"
@@ -253,8 +253,8 @@ Or use the helper script: `scripts/slack_helpers.py`
 6. [ ] Calculate problem_score from findings
 
 **DECISION POINT**
-7. [ ] If problem_score < 5.0 → ELIMINATE → Skip to step 10
-8. [ ] If problem_score >= 5.0 → Continue to Phase 2
+7. [ ] If problem_score < 6.0 → ELIMINATE → Skip to step 10
+8. [ ] If problem_score >= 6.0 → Continue to Phase 2
 
 **Phase 2: SOLUTION VALIDATION (Only if problem passes!)**
 9. [ ] Launch Task: feasibility-scorer
@@ -292,7 +292,7 @@ Or use the helper script: `scripts/slack_helpers.py`
 | Resource Requirements | 1-10 |
 | Time to Market | 1-10 |
 
-**Passing Threshold**: Combined score >= 5.0/10
+**Passing Threshold**: Combined score >= 6.0/10
 
 ## Mem0 User ID Scheme
 
