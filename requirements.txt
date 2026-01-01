@@ -1,0 +1,11 @@
+# Ideation Pipeline Dependencies
+
+# Core
+mem0ai>=0.1.0
+requests>=2.28.0
+
+# Optional: for python-dotenv support (not required if using source .env)
+python-dotenv>=1.0.0
+
+# Development (optional)
+pytest>=7.0.0

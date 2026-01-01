@@ -7,12 +7,49 @@ import os
 import requests
 from typing import Dict, List, Optional
 from datetime import datetime, timedelta
+from pathlib import Path
 
-SERPER_API_KEY = os.environ.get("SERPER_API_KEY")
+
+def load_env_var(var_name: str) -> Optional[str]:
+    """
+    Load environment variable from env or .env file.
+
+    Args:
+        var_name: Name of the environment variable
+
+    Returns:
+        Value if found, None otherwise
+    """
+    # First try environment
+    value = os.environ.get(var_name)
+    if value:
+        return value
+
+    # Try loading from .env file
+    env_paths = [
+        Path(__file__).parent.parent / ".env",  # scripts/../.env
+        Path.cwd() / ".env",  # current directory
+    ]
+
+    for env_path in env_paths:
+        if env_path.exists():
+            try:
+                with open(env_path, "r") as f:
+                    for line in f:
+                        line = line.strip()
+                        if line.startswith(f"{var_name}="):
+                            return line.split("=", 1)[1].strip().strip('"').strip("'")
+            except Exception:
+                continue
+
+    return None
+
+
+SERPER_API_KEY = load_env_var("SERPER_API_KEY")
 SERPER_BASE_URL = "https://google.serper.dev"
 
 # Optional: X (Twitter) API credentials
-X_BEARER_TOKEN = os.environ.get("X_BEARER_TOKEN")
+X_BEARER_TOKEN = load_env_var("X_BEARER_TOKEN")
 
 # Default timeout for HTTP requests (seconds)
 DEFAULT_TIMEOUT = 30
