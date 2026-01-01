@@ -2,6 +2,35 @@
 
 Multi-agent startup problem validator using Claude Code native sub-agents.
 
+## Quick Start
+
+```bash
+# 1. Clone the repo
+git clone https://github.com/0xtechdean/ideation-claude.git
+cd ideation-claude
+
+# 2. Set up environment
+cp .env.example .env
+# Edit .env with your API keys (MEM0_API_KEY, SERPER_API_KEY, SLACK_BOT_TOKEN, SLACK_CHANNEL_ID)
+
+# 3. Start Claude Code in the repo
+claude
+
+# 4. Ask Claude to validate a problem
+> Validate the problem: "Legal research is too time-consuming for small law firms"
+```
+
+That's it! Claude reads `CLAUDE.md`, orchestrates 4 sub-agents, and delivers a comprehensive evaluation report.
+
+## Features
+
+- **Autonomous Execution**: Uses ralph-wiggum plugin for hands-free operation
+- **Opus 4.5 Model**: All agents run on Claude's most capable model
+- **Two-Phase Validation**: Problem validation must pass before solution validation
+- **Early Elimination**: Skip solution phase if problem_score < 6.0
+- **Parallel Agents**: Problem validation agents run simultaneously
+- **Full Reports**: Saved to `reports/` and sent to Slack
+
 ## Architecture
 
 ```
@@ -25,7 +54,7 @@ Multi-agent startup problem validator using Claude Code native sub-agents.
 │   │         Calculate problem_score                         │  │
 │   └─────────────────────────────────────────────────────────┘  │
 │                              │                                  │
-│           problem_score < 5.0? ──► ELIMINATE ──┐               │
+│           problem_score < 6.0? ──► ELIMINATE ──┐               │
 │                              │                  │               │
 │                              ▼ (if passes)      │               │
 │   Phase 2: SOLUTION VALIDATION                  │               │
@@ -60,7 +89,7 @@ Multi-agent startup problem validator using Claude Code native sub-agents.
    - `market-researcher` - Market trends, TAM/SAM/SOM, market size score
    - `customer-solution` - Customer segments, pain points, WTP score
    - Calculate `problem_score` (severity, market, WTP, solution fit)
-4. **DECISION POINT**: If `problem_score < 5.0` → ELIMINATE → Skip to Phase 3
+4. **DECISION POINT**: If `problem_score < 6.0` → ELIMINATE → Skip to Phase 3
 5. **Phase 2: SOLUTION VALIDATION** (only if problem passes):
    - `feasibility-scorer` - Competition, tech stack, resource requirements
    - Calculate `solution_score` and `combined_score`
@@ -87,7 +116,7 @@ PHASE 1: PROBLEM VALIDATION (parallel)
 └── customer-solution  ─┴──► Calculate problem_score
          │
          ▼
-    problem_score < 5.0?
+    problem_score < 6.0?
          │
     ┌────┴────┐
     │  YES    │──► ELIMINATE ──► report-pivot ──► Report + Pivot Suggestions
@@ -101,9 +130,9 @@ PHASE 2: SOLUTION VALIDATION
     combined = (problem × 60%) + (solution × 40%)
          │
          ▼
-    combined >= 5.0? ──► PASS ──► report-pivot ──► Final Report
+    combined >= 6.0? ──► PASS ──► report-pivot ──► Final Report
          │
-    combined < 5.0?  ──► FAIL ──► report-pivot ──► Report + Pivot Suggestions
+    combined < 6.0?  ──► FAIL ──► report-pivot ──► Report + Pivot Suggestions
 ```
 
 ## Scoring Criteria
@@ -124,16 +153,27 @@ PHASE 2: SOLUTION VALIDATION
 | Resource Requirements |
 | Time to Market |
 
-**Passing Threshold**: Combined score >= 5.0/10
+**Passing Threshold**: Combined score >= 6.0/10
 
 ## Usage
 
+### Option 1: Direct with Claude Code (Recommended)
 ```bash
-# In Slack
-@Claude go to https://github.com/Othentic-Ai/ideation-claude and validate "Your problem statement here"
+# Clone and start
+git clone https://github.com/0xtechdean/ideation-claude.git
+cd ideation-claude
+claude
 
-# Example
-@Claude go to ideation-claude and validate "Legal research is too time-consuming and expensive for small law firms"
+# Then ask Claude:
+> Validate the problem: "Your problem statement here"
+
+# Or use ralph-wiggum for fully autonomous execution:
+> /ralph-loop "Validate the problem: Your problem statement here" --max-iterations 30
+```
+
+### Option 2: Via Slack
+```bash
+@Claude go to https://github.com/0xtechdean/ideation-claude and validate "Your problem statement here"
 ```
 
 ## Performance
@@ -172,6 +212,7 @@ Located in `scripts/`:
 ideation-claude/
 ├── CLAUDE.md                    # Orchestrator instructions
 ├── .claude/
+│   ├── settings.json            # Claude Code config (acceptEdits)
 │   └── agents/
 │       ├── market-researcher.md
 │       ├── customer-solution.md
@@ -185,17 +226,6 @@ ideation-claude/
 ├── reports/                     # Generated evaluation reports
 └── .env.example
 ```
-
-## Features
-
-- **Two-Phase Validation**: Problem validation MUST pass before solution validation
-- **Early Elimination**: Skip solution phase entirely if problem_score < 5.0
-- **Native Sub-Agents**: No external repos, all agents in `.claude/agents/`
-- **Parallel Execution**: Problem validation agents run simultaneously
-- **Weighted Scoring**: 60% problem + 40% solution = combined score
-- **Mem0 Context**: Shared session state across all agents
-- **Slack Notifications**: Summary sent after completion
-- **Pivot Suggestions**: If eliminated, suggests 3-5 alternative directions
 
 ## License
 
