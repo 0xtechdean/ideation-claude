@@ -6,6 +6,33 @@
 2. **Use ralph-wiggum** for autonomous execution: `/ralph-loop "Validate: {problem}" --max-iterations 30`
 3. **Never stop mid-flow** - complete all 5 phases before presenting results
 
+## Research Source Requirements
+
+**ALWAYS prioritize non-promotional sources.** Extract and include relevant quotes.
+
+### Preferred Sources (Use These)
+| Source Type | Examples | Why |
+|-------------|----------|-----|
+| Research Reports | MIT, Gartner, Forrester, McKinsey | Data-driven, credible |
+| Industry Publications | HBR, TechCrunch, VentureBeat | Editorial, fact-checked |
+| Academic Papers | arxiv, ACM, IEEE | Peer-reviewed |
+| Government/NGO | EU, NIST, CSA, OWASP | Authoritative |
+| News Outlets | Reuters, Bloomberg, WSJ | Journalistic standards |
+
+### Avoid These Sources
+| Source Type | Examples | Why |
+|-------------|----------|-----|
+| Vendor Blogs | Company marketing blogs | Promotional bias |
+| Product Pages | Pricing/features pages | Sales material |
+| Press Releases | Company announcements | Self-serving |
+| Sponsored Content | "Partnered with" articles | Paid placement |
+
+### Quote Extraction Rules
+- Extract 2-4 key quotes per major section
+- Format: `> "Quote text" — Source Name, Date`
+- Focus on statistics, pain points, and market insights
+- Verify quotes match the actual article content
+
 ## Phase Execution Order
 
 1. **Initialize**: Generate session_id, write to Mem0

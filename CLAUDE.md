@@ -65,6 +65,32 @@ Validate the problem: "Legal research is too time-consuming and expensive for sm
 
 All sub-agents in `.claude/agents/` are configured with `model: opus`.
 
+## Research Source Requirements
+
+**CRITICAL: All agents MUST use non-promotional sources and include relevant quotes.**
+
+### Preferred Sources (Use These)
+| Type | Examples |
+|------|----------|
+| Research Reports | MIT, Gartner, Forrester, McKinsey, IDC |
+| Industry Publications | HBR, TechCrunch, VentureBeat, The Information |
+| Government/NGO | EU regulations, NIST, CSA, OWASP |
+| News Outlets | Reuters, Bloomberg, WSJ, Financial Times |
+
+### Avoid These Sources
+| Type | Why |
+|------|-----|
+| Vendor blogs | Promotional bias |
+| Product pages | Sales material |
+| Press releases | Self-serving |
+| Sponsored content | Paid placement |
+
+### Quote Requirements
+- Extract 4+ relevant quotes per report
+- Format: `> "Quote text" — Source Name, Date`
+- Focus on: pain points, market stats, expert opinions
+- Include sources table with type classification
+
 ## Autonomous Execution with Ralph-Wiggum
 
 **IMPORTANT**: When running the ideation flow, ALWAYS use the ralph-wiggum plugin for autonomous execution:

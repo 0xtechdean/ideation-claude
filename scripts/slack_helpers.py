@@ -50,6 +50,66 @@ def load_slack_credentials() -> tuple:
 SLACK_BOT_TOKEN, SLACK_CHANNEL_ID = load_slack_credentials()
 
 
+def format_table_for_slack(table_text: str) -> str:
+    """
+    Convert a markdown table to a clean Slack-friendly format.
+
+    For competitive matrices, uses emoji checkmarks.
+    For other tables, uses clean aligned rows.
+    """
+    lines = table_text.strip().split('\n')
+    if len(lines) < 2:
+        return table_text
+
+    # Parse header and rows
+    header_line = lines[0]
+    # Skip separator line (lines[1])
+    data_lines = lines[2:] if len(lines) > 2 else []
+
+    # Extract cells from each line
+    def parse_row(line):
+        cells = [c.strip() for c in line.split('|')]
+        # Remove empty first/last from | delimiters
+        return [c for c in cells if c]
+
+    headers = parse_row(header_line)
+    rows = [parse_row(line) for line in data_lines]
+
+    if not headers:
+        return table_text
+
+    # Check if this is a competitive matrix (has checkmarks/x marks)
+    is_matrix = ('✅' in table_text or '❌' in table_text or
+                 'Yes' in table_text or 'Partial' in table_text)
+
+    # Only use special formatting for competitive matrices
+    # Regular tables stay as code blocks
+    if not is_matrix:
+        return "```\n" + table_text + "```"
+
+    result_lines = []
+
+    # Format competitive matrix with bullet points
+    for row in rows:
+        if not row:
+            continue
+
+        # First column is the feature name
+        key = row[0] if row else ""
+
+        result_lines.append(f"*{key}*")
+        for i, val in enumerate(row[1:], 1):
+            if i < len(headers):
+                comp_name = headers[i]
+                # Convert Yes/No to emoji
+                display_val = val.replace('Yes', '✅').replace('No', '❌')
+                display_val = display_val.replace('Partial', '◐')
+                result_lines.append(f"  • {comp_name}: {display_val}")
+        result_lines.append("")
+
+    return '\n'.join(result_lines)
+
+
 def markdown_to_slack(text: str) -> str:
     """
     Convert GitHub-flavored Markdown to Slack mrkdwn format.
@@ -58,7 +118,7 @@ def markdown_to_slack(text: str) -> str:
     - **bold** -> *bold*
     - ## Header -> *Header*
     - [text](url) -> <url|text>
-    - Tables -> wrapped in code blocks
+    - Tables -> clean formatted rows (not code blocks)
     - --- -> unicode line
 
     Args:
@@ -76,12 +136,12 @@ def markdown_to_slack(text: str) -> str:
     # Convert links: [text](url) -> <url|text>
     text = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'<\2|\1>', text)
 
-    # Convert markdown tables to code blocks for readability
+    # Convert markdown tables to clean Slack format
     def convert_table(match):
         table = match.group(0)
-        return "```\n" + table + "```"
+        return format_table_for_slack(table)
 
-    # Find markdown tables and wrap in code blocks
+    # Find markdown tables and convert to Slack format
     table_pattern = r'(\|[^\n]+\|\n)(\|[-:| ]+\|\n)((?:\|[^\n]+\|\n?)+)'
     text = re.sub(table_pattern, convert_table, text)
 
