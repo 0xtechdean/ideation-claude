@@ -56,6 +56,15 @@ A user asks you to validate a startup problem:
 Validate the problem: "Legal research is too time-consuming and expensive for small law firms"
 ```
 
+## Model Requirements
+
+**ALWAYS use Opus 4.5** (`model: opus`) for all ideation flow agents and tasks. This ensures:
+- Highest quality market research and analysis
+- Best reasoning for scoring and decision-making
+- Most comprehensive report generation
+
+All sub-agents in `.claude/agents/` are configured with `model: opus`.
+
 ## Autonomous Execution with Ralph-Wiggum
 
 **IMPORTANT**: When running the ideation flow, ALWAYS use the ralph-wiggum plugin for autonomous execution:
