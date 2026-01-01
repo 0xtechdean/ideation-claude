@@ -166,6 +166,36 @@ def split_message(text: str, max_len: int = 3500) -> List[str]:
     Returns:
         List of text chunks
     """
+    def split_long_text(text: str, max_len: int) -> List[str]:
+        """Split text that exceeds max_len by lines, then by characters."""
+        if len(text) <= max_len:
+            return [text]
+
+        result = []
+        lines = text.split('\n')
+        current = ""
+
+        for line in lines:
+            # If single line exceeds max, split by characters
+            if len(line) > max_len:
+                if current.strip():
+                    result.append(current.strip())
+                    current = ""
+                # Split long line into chunks
+                for i in range(0, len(line), max_len - 100):
+                    result.append(line[i:i + max_len - 100])
+            elif len(current) + len(line) + 1 < max_len:
+                current += line + '\n'
+            else:
+                if current.strip():
+                    result.append(current.strip())
+                current = line + '\n'
+
+        if current.strip():
+            result.append(current.strip())
+
+        return result
+
     # Try to split by bold headers (sections in Slack format)
     sections = re.split(r'(\n\*[^*\n]+\*\n)', text)
     chunks = []
@@ -177,11 +207,19 @@ def split_message(text: str, max_len: int = 3500) -> List[str]:
         else:
             if current.strip():
                 chunks.append(current.strip())
-            # If single section is too long, split by paragraphs
+            # If single section is too long, split it
             if len(section) > max_len:
+                # First try paragraphs
                 paragraphs = section.split('\n\n')
+                current = ""
                 for para in paragraphs:
-                    if len(current) + len(para) < max_len:
+                    if len(para) > max_len:
+                        # Paragraph too long, split by lines
+                        if current.strip():
+                            chunks.append(current.strip())
+                            current = ""
+                        chunks.extend(split_long_text(para, max_len))
+                    elif len(current) + len(para) + 2 < max_len:
                         current += para + '\n\n'
                     else:
                         if current.strip():
