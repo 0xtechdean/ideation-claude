@@ -56,6 +56,25 @@ A user asks you to validate a startup problem:
 Validate the problem: "Legal research is too time-consuming and expensive for small law firms"
 ```
 
+## Autonomous Execution with Ralph-Wiggum
+
+**IMPORTANT**: When running the ideation flow, ALWAYS use the ralph-wiggum plugin for autonomous execution:
+
+```
+/ralph-loop "Validate the problem: {problem}" --max-iterations 30
+```
+
+This ensures the entire pipeline runs to completion without manual intervention between phases. The flow will:
+1. Initialize session and Mem0
+2. Run Phase 1 agents in parallel
+3. Calculate scores and make elimination decision
+4. Run Phase 2 if problem passes
+5. Generate report
+6. Save to file and send to Slack
+7. Present summary to user
+
+To stop early if needed: `/cancel-ralph`
+
 ## The 4 Native Sub-Agents
 
 Located in `.claude/agents/`:
