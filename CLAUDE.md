@@ -197,81 +197,62 @@ Use the **Write tool** to save the report file.
 
 ### Phase 5: Send FULL Report to Slack
 
-After saving the report, **ALWAYS send both a summary AND the full report to Slack**:
+After saving the report, **ALWAYS send both a summary AND the full report to Slack**.
 
-#### Step 1: Send Summary Message
+**IMPORTANT**: Slack uses `mrkdwn` format, NOT standard Markdown. Always convert before sending!
+
+| Markdown | Slack mrkdwn |
+|----------|--------------|
+| `**bold**` | `*bold*` |
+| `## Header` | `*Header*` |
+| `[text](url)` | `<url\|text>` |
+| Tables | Wrap in \`\`\` code blocks |
+
+#### Step 1: Send Summary (Block Kit)
+
 ```python
-import os
-import requests
+from scripts.slack_helpers import send_evaluation_report
 
-def send_summary_to_slack(session_id, problem, score, verdict, tam, som, segment, gap, report_path, next_steps):
-    """Send evaluation summary to Slack."""
-    bot_token = os.environ["SLACK_BOT_TOKEN"]
-    channel_id = os.environ.get("SLACK_CHANNEL_ID", "C0A5GGQ250F")
-
-    status_emoji = "✅" if verdict == "PASS" else "❌"
-
-    blocks = [
-        {"type": "header", "text": {"type": "plain_text", "text": f"{status_emoji} Startup Evaluation Complete"}},
-        {"type": "section", "fields": [
-            {"type": "mrkdwn", "text": f"*Session:* `{session_id}`"},
-            {"type": "mrkdwn", "text": f"*Score:* *{score}/10*"}
-        ]},
-        {"type": "section", "fields": [
-            {"type": "mrkdwn", "text": f"*Verdict:* {status_emoji} *{verdict}*"},
-            {"type": "mrkdwn", "text": f"*TAM:* {tam}"}
-        ]},
-        {"type": "divider"},
-        {"type": "section", "text": {"type": "mrkdwn", "text": f"*Problem:*\n>{problem[:200]}"}},
-        {"type": "section", "fields": [
-            {"type": "mrkdwn", "text": f"*SOM (Year 1):* {som}"},
-            {"type": "mrkdwn", "text": f"*Primary Segment:* {segment}"}
-        ]},
-        {"type": "section", "text": {"type": "mrkdwn", "text": f"*Key Gap:* {gap}"}},
-        {"type": "divider"},
-        {"type": "section", "text": {"type": "mrkdwn", "text": "*Next Steps:*\n" + "\n".join([f"• {s}" for s in next_steps[:4]])}},
-        {"type": "context", "elements": [{"type": "mrkdwn", "text": f"📄 Full report attached below"}]}
-    ]
-
-    requests.post(
-        "https://slack.com/api/chat.postMessage",
-        headers={"Authorization": f"Bearer {bot_token}", "Content-Type": "application/json"},
-        json={"channel": channel_id, "text": f"Evaluation Complete: {verdict} ({score}/10)", "blocks": blocks}
-    )
+send_evaluation_report(
+    session_id=session_id,
+    problem=problem,
+    score=combined_score,
+    verdict=verdict,
+    tam=tam,
+    som=som,
+    primary_segment=segment,
+    key_gap=gap,
+    report_path=report_path,
+    next_steps=next_steps
+)
 ```
 
-#### Step 2: Upload FULL Report as File
+#### Step 2: Send Full Report (Converted to Slack format)
+
 ```python
-def upload_full_report_to_slack(report_path, session_id, problem):
-    """Upload the full report markdown file to Slack."""
-    bot_token = os.environ["SLACK_BOT_TOKEN"]
-    channel_id = os.environ.get("SLACK_CHANNEL_ID", "C0A5GGQ250F")
+from scripts.slack_helpers import send_full_report
 
-    with open(report_path, 'r') as f:
-        report_content = f.read()
+result = send_full_report(
+    report_path=f"reports/{sanitized_name}-{session_id}.md",
+    session_id=session_id,
+    verdict=verdict,
+    score=combined_score
+)
 
-    # Upload file to Slack
-    response = requests.post(
-        "https://slack.com/api/files.upload",
-        headers={"Authorization": f"Bearer {bot_token}"},
-        data={
-            "channels": channel_id,
-            "content": report_content,
-            "filename": f"evaluation-report-{session_id}.md",
-            "filetype": "markdown",
-            "title": f"Full Evaluation Report: {problem[:50]}...",
-            "initial_comment": f"📋 Full evaluation report for session `{session_id}`"
-        }
-    )
-    return response.json()
+print(f"Sent {result['messages_sent']} messages to Slack")
 ```
 
-**IMPORTANT**: You MUST always:
-1. Save the report to `./reports/{name}-{session_id}.md`
-2. Send summary message to Slack
-3. Upload the full report file to Slack
+The `send_full_report()` function automatically:
+1. Reads the markdown report
+2. Converts to Slack mrkdwn format (headers, bold, links, tables)
+3. Splits into chunks (~3500 chars each)
+4. Sends with rate limiting to avoid API errors
 
-Or use the helper script: `scripts/slack_helpers.py`
+#### Environment Variables
+
+The helper script loads credentials automatically from:
+1. Environment variables (`SLACK_BOT_TOKEN`, `SLACK_CHANNEL_ID`)
+2. Fallback to `.env` file if env vars not set
 
 ## Complete Orchestration Checklist
 
@@ -299,8 +280,8 @@ Or use the helper script: `scripts/slack_helpers.py`
 12. [ ] Save full report to `reports/{name}-{session_id}.md`
 
 **Phase 5: Send to Slack (ALWAYS DO THIS)**
-13. [ ] Send formatted summary to Slack channel
-14. [ ] Upload FULL report markdown file to Slack
+13. [ ] Send formatted summary to Slack (Block Kit)
+14. [ ] Send full report to Slack (converted to mrkdwn format)
 15. [ ] Present summary and file location to user
 
 **Expected Time**:
@@ -363,7 +344,11 @@ The `scripts/` directory contains reusable Python helpers:
 - `web_research.py` - Web search functions using Serper API
 - `mem0_helpers.py` - Streamlined Mem0 operations
 - `analysis_tools.py` - TAM/SAM/SOM calculation, scoring, competitive analysis
-- `slack_helpers.py` - Send formatted reports to Slack
+- `slack_helpers.py` - Slack integration with:
+  - `markdown_to_slack()` - Convert GitHub markdown to Slack mrkdwn
+  - `send_full_report()` - Send full report (auto-converts and chunks)
+  - `send_evaluation_report()` - Send Block Kit summary
+  - `load_slack_credentials()` - Auto-loads from env or .env file
 
 ## Example Orchestration
 
@@ -399,7 +384,8 @@ You should:
    - Save full report to `reports/legal-research-evaluation-abc12345.md`
 
 8. **Phase 5: NOTIFY**:
-   - Send summary to Slack
+   - Send Block Kit summary to Slack
+   - Send full report to Slack (converted to mrkdwn, chunked)
    - Present summary and file location to user
 
 **Early Elimination Example** (if problem_score = 3.5):

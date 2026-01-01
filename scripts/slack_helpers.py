@@ -1,14 +1,204 @@
 """
 Slack Helper Scripts for Ideation Flow
 Send evaluation reports and notifications to Slack
+
+Key Functions:
+- markdown_to_slack(): Convert GitHub markdown to Slack mrkdwn format
+- send_full_report(): Send full report as properly formatted Slack messages
+- send_evaluation_report(): Send summary with Block Kit formatting
 """
 
 import os
+import re
+import time
 import requests
-from typing import Dict, Optional
+from typing import Dict, List, Optional
+from pathlib import Path
 
-SLACK_BOT_TOKEN = os.environ.get("SLACK_BOT_TOKEN")
-SLACK_CHANNEL_ID = os.environ.get("SLACK_CHANNEL_ID")
+
+def load_slack_credentials() -> tuple:
+    """
+    Load Slack credentials from environment or .env file.
+
+    Returns:
+        Tuple of (bot_token, channel_id)
+    """
+    bot_token = os.environ.get("SLACK_BOT_TOKEN")
+    channel_id = os.environ.get("SLACK_CHANNEL_ID")
+
+    # If not in environment, try loading from .env file
+    if not bot_token or not channel_id:
+        env_paths = [
+            Path(__file__).parent.parent / ".env",  # scripts/../.env
+            Path.cwd() / ".env",  # current directory
+        ]
+
+        for env_path in env_paths:
+            if env_path.exists():
+                with open(env_path, "r") as f:
+                    for line in f:
+                        line = line.strip()
+                        if line.startswith("SLACK_BOT_TOKEN=") and not bot_token:
+                            bot_token = line.split("=", 1)[1].strip()
+                        elif line.startswith("SLACK_CHANNEL_ID=") and not channel_id:
+                            channel_id = line.split("=", 1)[1].strip()
+                break
+
+    return bot_token, channel_id
+
+
+SLACK_BOT_TOKEN, SLACK_CHANNEL_ID = load_slack_credentials()
+
+
+def markdown_to_slack(text: str) -> str:
+    """
+    Convert GitHub-flavored Markdown to Slack mrkdwn format.
+
+    Conversions:
+    - **bold** -> *bold*
+    - ## Header -> *Header*
+    - [text](url) -> <url|text>
+    - Tables -> wrapped in code blocks
+    - --- -> unicode line
+
+    Args:
+        text: Markdown formatted text
+
+    Returns:
+        Slack mrkdwn formatted text
+    """
+    # Convert headers: ## Header -> *Header*
+    text = re.sub(r'^#{1,6}\s+(.+)$', r'*\1*', text, flags=re.MULTILINE)
+
+    # Convert bold: **text** -> *text*
+    text = re.sub(r'\*\*(.+?)\*\*', r'*\1*', text)
+
+    # Convert links: [text](url) -> <url|text>
+    text = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'<\2|\1>', text)
+
+    # Convert markdown tables to code blocks for readability
+    def convert_table(match):
+        table = match.group(0)
+        return "```\n" + table + "```"
+
+    # Find markdown tables and wrap in code blocks
+    table_pattern = r'(\|[^\n]+\|\n)(\|[-:| ]+\|\n)((?:\|[^\n]+\|\n?)+)'
+    text = re.sub(table_pattern, convert_table, text)
+
+    # Remove horizontal rules (---) and replace with unicode line
+    text = re.sub(r'^---+$', '━' * 40, text, flags=re.MULTILINE)
+
+    # Clean up multiple blank lines
+    text = re.sub(r'\n{3,}', '\n\n', text)
+
+    return text
+
+
+def split_message(text: str, max_len: int = 3500) -> List[str]:
+    """
+    Split text into chunks suitable for Slack messages.
+    Tries to split at section boundaries for readability.
+
+    Args:
+        text: Text to split
+        max_len: Maximum length per chunk
+
+    Returns:
+        List of text chunks
+    """
+    # Try to split by bold headers (sections in Slack format)
+    sections = re.split(r'(\n\*[^*\n]+\*\n)', text)
+    chunks = []
+    current = ""
+
+    for section in sections:
+        if len(current) + len(section) < max_len:
+            current += section
+        else:
+            if current.strip():
+                chunks.append(current.strip())
+            # If single section is too long, split by paragraphs
+            if len(section) > max_len:
+                paragraphs = section.split('\n\n')
+                for para in paragraphs:
+                    if len(current) + len(para) < max_len:
+                        current += para + '\n\n'
+                    else:
+                        if current.strip():
+                            chunks.append(current.strip())
+                        current = para + '\n\n'
+            else:
+                current = section
+
+    if current.strip():
+        chunks.append(current.strip())
+
+    return chunks
+
+
+def send_full_report(
+    report_path: str,
+    channel_id: str = None,
+    session_id: str = "",
+    verdict: str = "",
+    score: float = 0
+) -> Dict:
+    """
+    Send a full report to Slack, properly formatted for Slack mrkdwn.
+
+    The report is:
+    1. Converted from Markdown to Slack mrkdwn format
+    2. Split into chunks that fit Slack's message limits
+    3. Sent as multiple messages with rate limiting
+
+    Args:
+        report_path: Path to the markdown report file
+        channel_id: Slack channel (defaults to SLACK_CHANNEL_ID)
+        session_id: Session ID for header message
+        verdict: PASS/FAIL for header
+        score: Combined score for header
+
+    Returns:
+        Dict with status and message count
+    """
+    channel = channel_id or SLACK_CHANNEL_ID
+
+    # Read the report
+    with open(report_path, "r") as f:
+        content = f.read()
+
+    # Convert to Slack format
+    slack_content = markdown_to_slack(content)
+
+    # Split into chunks
+    chunks = split_message(slack_content)
+
+    # Send header message first
+    status_emoji = "✅" if verdict.upper() == "PASS" else "❌"
+    header = f"{status_emoji} *Full Evaluation Report* - Session `{session_id}` - Score: *{score}/10* - Verdict: *{verdict}*"
+
+    results = []
+
+    # Send header
+    response = post_message(header, channel)
+    results.append(response)
+    time.sleep(0.3)
+
+    # Send each chunk
+    for i, chunk in enumerate(chunks):
+        response = post_message(chunk, channel)
+        results.append(response)
+        time.sleep(0.3)  # Rate limiting
+
+    # Check results
+    success_count = sum(1 for r in results if r.get("ok"))
+
+    return {
+        "ok": success_count == len(results),
+        "messages_sent": success_count,
+        "total_chunks": len(chunks) + 1,  # +1 for header
+        "errors": [r.get("error") for r in results if not r.get("ok")]
+    }
 
 
 def post_message(text: str, channel_id: str = None, blocks: list = None) -> Dict:
@@ -235,9 +425,17 @@ def send_simple_notification(
 
 if __name__ == "__main__":
     # Test the functions
-    print("Testing Slack helper functions...")
-    print("Functions available:")
-    print("- post_message()")
-    print("- format_evaluation_report()")
-    print("- send_evaluation_report()")
-    print("- send_simple_notification()")
+    print("Slack Helper Functions for Ideation Flow")
+    print("=" * 50)
+    print("\nCredentials loaded:", "✅" if SLACK_BOT_TOKEN else "❌")
+    print(f"Channel ID: {SLACK_CHANNEL_ID or 'Not set'}")
+    print("\nAvailable functions:")
+    print("  - markdown_to_slack(text)        # Convert markdown to Slack mrkdwn")
+    print("  - split_message(text)            # Split long text into chunks")
+    print("  - send_full_report(report_path)  # Send full report to Slack")
+    print("  - post_message(text)             # Send simple message")
+    print("  - send_evaluation_report(...)    # Send formatted summary")
+    print("  - send_simple_notification(...)  # Send simple notification")
+    print("\nExample usage:")
+    print('  from scripts.slack_helpers import send_full_report')
+    print('  send_full_report("reports/my-report.md", session_id="abc123", verdict="PASS", score=8.5)')
