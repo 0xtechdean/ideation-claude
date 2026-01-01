@@ -16,3 +16,5 @@ Thumbs.db
 output/
 reports/
 *.log
+__pycache__/
+.mcp.json
