@@ -521,6 +521,141 @@ def send_simple_notification(
     return post_message(title, channel_id, blocks)
 
 
+def send_moat_assessment(
+    session_id: str,
+    true_moats: List[Dict[str, str]],
+    not_moats: List[Dict[str, str]],
+    unique_differentiator: str,
+    competitors_analyzed: str,
+    verdict: str,
+    channel_id: str = None
+) -> Dict:
+    """
+    Send a moat assessment to Slack with proper formatting.
+
+    Args:
+        session_id: Evaluation session ID
+        true_moats: List of dicts with 'name', 'description', 'replication_time'
+        not_moats: List of dicts with 'name', 'reason'
+        unique_differentiator: The ONE unique differentiator
+        competitors_analyzed: String listing competitors
+        verdict: GO / PIVOT / STOP
+        channel_id: Slack channel (defaults to env var)
+
+    Returns:
+        Slack API response
+
+    Example:
+        send_moat_assessment(
+            session_id="abc123",
+            true_moats=[
+                {"name": "Work Context ML", "description": "Detects if WORK is authorized", "replication_time": "18-24 mo"},
+                {"name": "Data Network Effects", "description": "Shared threat intel", "replication_time": "12-18 mo"},
+            ],
+            not_moats=[
+                {"name": "Low pricing", "reason": "Competitors match overnight"},
+                {"name": "MCP support", "reason": "5+ gateways exist"},
+            ],
+            unique_differentiator="Work Context ML - Detecting if the WORK being done is authorized for the DATA",
+            competitors_analyzed="Airia ($100M), Reco ($65M), Lasso ($28M)",
+            verdict="GO - with pivot"
+        )
+    """
+    # Format true moats
+    moats_text = "\n".join([
+        f"• *{m['name']}* - {m['description']}. _{m['replication_time']} to replicate._"
+        for m in true_moats
+    ])
+
+    # Format not moats
+    not_moats_text = "\n".join([
+        f"• {m['name']} - {m['reason']}"
+        for m in not_moats
+    ])
+
+    # Determine emoji based on verdict
+    if "GO" in verdict.upper():
+        verdict_emoji = "✅"
+    elif "PIVOT" in verdict.upper():
+        verdict_emoji = "🔄"
+    else:
+        verdict_emoji = "🛑"
+
+    blocks = [
+        {
+            "type": "header",
+            "text": {
+                "type": "plain_text",
+                "text": f"🏰 Moat Assessment - Session {session_id}",
+                "emoji": True
+            }
+        },
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": "*Competitive Edge Analysis Complete*\nHere's what IS and ISN'T defensible."
+            }
+        },
+        {"type": "divider"},
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": "*✅ TRUE MOATS (Defensible)*"
+            }
+        },
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": moats_text
+            }
+        },
+        {"type": "divider"},
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": "*❌ NOT MOATS (Easily Replicated)*"
+            }
+        },
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": not_moats_text
+            }
+        },
+        {"type": "divider"},
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": f"*🎯 The ONE Unique Differentiator*\n\n{unique_differentiator}"
+            }
+        },
+        {"type": "divider"},
+        {
+            "type": "section",
+            "fields": [
+                {
+                    "type": "mrkdwn",
+                    "text": f"*Competitors Analyzed:*\n{competitors_analyzed}"
+                },
+                {
+                    "type": "mrkdwn",
+                    "text": f"*Verdict:*\n{verdict_emoji} *{verdict}*"
+                }
+            ]
+        }
+    ]
+
+    fallback_text = f"Moat Assessment - Session {session_id} - Verdict: {verdict}"
+
+    return post_message(fallback_text, channel_id, blocks)
+
+
 if __name__ == "__main__":
     # Test the functions
     print("Slack Helper Functions for Ideation Flow")

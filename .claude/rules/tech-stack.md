@@ -22,6 +22,15 @@ Located in `.claude/agents/`:
 - `customer-solution.md` - Customer discovery agent
 - `feasibility-scorer.md` - Solution validation agent
 - `report-pivot.md` - Report generation agent
+- `deep-research-analyst.md` - High-quality research with confidence scoring
+
+### Skills (Slash Commands)
+Located in `.claude/commands/`:
+- `/validate <problem>` - Full ideation pipeline
+- `/quick-check <problem>` - Lightweight validation (market + customer only)
+- `/compare <problem1> vs <problem2>` - Side-by-side comparison
+- `/report <session_id>` - Retrieve or regenerate a report
+- `/research <topic>` - Deep research with confidence scoring and evidence chains
 
 ### Settings
 - `.claude/settings.json` - Project permissions (acceptEdits, allowed commands)
