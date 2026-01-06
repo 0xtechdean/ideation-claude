@@ -163,15 +163,6 @@ Your output MUST include:
 | [Component 1] | Build/Buy | [Why] |
 | [Component 2] | Build/Buy | [Why] |
 
-### Team Requirements
-| Role | Count | Priority |
-|------|-------|----------|
-| Backend Engineer | X | P0 |
-| Frontend Engineer | X | P0 |
-| DevOps | X | P1 |
-| Product Manager | X | P0 |
-| **Total** | **X FTEs** | |
-
 ### Technical Risk Assessment
 - Technical Viability: X/10
 - Resource Availability: X/10

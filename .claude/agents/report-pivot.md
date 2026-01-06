@@ -93,11 +93,22 @@ Your report MUST follow this exact structure with 5 sections:
 | [Feature 2] | [What it does] | [Why customers need it] |
 | [Feature 3] | [What it does] | [Why customers need it] |
 
-### Technical Approach
-- **Stack:** [Key technologies]
-- **Timeline:** [X months to MVP]
-- **Team:** [X FTEs needed]
-- **Budget:** [$X Year 1]
+### Regulatory & Compliance Screening (If Applicable)
+*Include this section only for solutions involving: healthcare data, financial data, personal data, payments, or regulated industries*
+
+| Regulation | Applicability | Risk Level | Notes |
+|------------|---------------|------------|-------|
+| GDPR | Yes/No/Partial | High/Med/Low | [Data privacy impact] |
+| HIPAA | Yes/No/Partial | High/Med/Low | [Healthcare data requirements] |
+| SOC 2 | Yes/No/Partial | High/Med/Low | [Security certification needs] |
+| PCI-DSS | Yes/No/Partial | High/Med/Low | [Payment data handling] |
+| Industry-specific | Yes/No/Partial | High/Med/Low | [Sector regulations] |
+
+**Key Compliance Requirements:**
+- Data residency: [Where data must be stored]
+- Encryption: [At rest and in transit requirements]
+- Audit trails: [Logging and monitoring needs]
+- Certifications: [ISO, SOC, etc. needed before selling]
 
 ---
 
@@ -146,6 +157,21 @@ Your report MUST follow this exact structure with 5 sections:
 | [Competitor 1] | $XM | $XB | [Description] | [Weakness] |
 | [Competitor 2] | $XM | $XB | [Description] | [Weakness] |
 | [Competitor 3] | $XM | $XB | [Description] | [Weakness] |
+
+### Pricing Intelligence (Validates Willingness to Pay)
+*Note: Pricing is NOT a moat - it signals problem severity and willingness to pay*
+
+| Competitor | Pricing Model | Entry Price | Enterprise Price |
+|------------|---------------|-------------|------------------|
+| [Comp 1] | SaaS/Usage/Flat | $X/mo | $X/mo |
+| [Comp 2] | SaaS/Usage/Flat | $X/mo | $X/mo |
+| [Comp 3] | SaaS/Usage/Flat | $X/mo | $X/mo |
+
+**What Pricing Tells Us:**
+- **Problem Severity Signal:** [High prices = painful problem worth solving]
+- **Market Willingness to Pay:** $X-Y/mo range validates budget exists
+- **Price Ceiling:** [What the market will bear]
+- **Commoditization Risk:** [Is pricing compressing? Race to bottom?]
 
 ### Our Competitive Moats (Minimum 3 Required)
 
