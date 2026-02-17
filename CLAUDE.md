@@ -237,14 +237,8 @@ The report should include all sections:
 - Executive Summary
 - Scores Summary table
 - Market Analysis (TAM/SAM/SOM, trends, stats)
-- Customer Segments (ICP, pain points, Mom Test)
-- Competitive Landscape (matrix, gaps, advantages)
-- Technical Considerations (stack, integrations)
-- MVP Recommendations (timeline, features, metrics)
-- Team Requirements & Budget
+- Competitive Landscape (key competitors, gaps, advantages)
 - Key Risks & Mitigations
-- Validation Experiments
-- Recommended Next Steps
 - Sources/References
 
 Use the **Write tool** to save the report file.
