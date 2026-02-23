@@ -178,6 +178,57 @@ def search_pricing_data(product_type: str, industry: str = None) -> Dict:
     }
 
 
+def _build_reddit_dork(keywords: List[str]) -> str:
+    """
+    Build a Google search dork that surfaces authentic first-person
+    struggles and pain points from Reddit comment threads.
+
+    Args:
+        keywords: Topic keywords (e.g., ["legal research", "small law firms"])
+
+    Returns:
+        Google dork query string targeting Reddit pain discussions
+    """
+    topic = " OR ".join(f'"{kw}"' for kw in keywords)
+
+    first_person = (
+        '"I think" OR "I feel" OR "I was" OR "I\'ve been" OR "I have been" '
+        'OR "my experience" OR "IMO" OR "I realized" OR "I learned" '
+        'OR "my biggest struggle" OR "my biggest fear" OR "I found that"'
+    )
+
+    struggle = (
+        '"struggle" OR "problem" OR "issue" OR "challenge" '
+        'OR "difficulty" OR "frustration" OR "concern" '
+        'OR "obstacle" OR "barrier" OR "what I wish I knew" '
+        'OR "what I regret" OR "doesn\'t work" OR "not working"'
+    )
+
+    return f"{topic} site:reddit.com inurl:comments ({first_person}) ({struggle})"
+
+
+def search_reddit_struggles(keywords: List[str], num_results: int = 10) -> Dict:
+    """
+    Search Reddit for authentic first-person pain points using targeted
+    Google dork that filters for real user experiences in comment threads.
+
+    Args:
+        keywords: Topic keywords to search for (1-3 phrases work best)
+        num_results: Number of results to return
+
+    Returns:
+        Dict with Reddit pain point threads and the query used
+    """
+    query = _build_reddit_dork(keywords)
+    results = search_web(query, num_results)
+
+    return {
+        "threads": results.get("organic", []),
+        "query_used": query,
+        "source": "reddit_dork"
+    }
+
+
 def search_customer_pain_points(problem: str, industry: str = None) -> Dict:
     """
     Search for customer pain points and complaints.
@@ -187,7 +238,7 @@ def search_customer_pain_points(problem: str, industry: str = None) -> Dict:
         industry: Industry context (optional)
 
     Returns:
-        Dict with pain point data from forums, reviews, etc.
+        Dict with pain point data from forums, reviews, and Reddit threads
     """
     queries = [
         f"{problem} challenges problems",
@@ -198,10 +249,16 @@ def search_customer_pain_points(problem: str, industry: str = None) -> Dict:
     if industry:
         queries = [f"{industry} {q}" for q in queries]
 
+    # Build keyword list for Reddit deep search
+    reddit_keywords = [problem]
+    if industry:
+        reddit_keywords.append(industry)
+
     results = {
         "challenges": search_web(queries[0], 10),
         "complaints": search_web(queries[1], 10),
-        "feedback": search_web(queries[2], 10)
+        "feedback": search_web(queries[2], 10),
+        "reddit_struggles": search_reddit_struggles(reddit_keywords)
     }
 
     return results
