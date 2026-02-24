@@ -343,6 +343,312 @@ def mine_reddit_pain_points(
     }
 
 
+###############################################################################
+# Review Mining — Surface ideas from 2-3 star reviews on G2, Capterra, etc.
+# 2-3 star reviewers are committed users hitting real, recurring limitations.
+# Their complaints are specific, actionable, and shared by silent users.
+###############################################################################
+
+REVIEW_COMPLAINT_KEYWORDS: List[str] = [
+    "wish", "but", "except", "missing", "would be perfect if",
+    "deal breaker", "switched from", "almost good enough",
+    "not enough", "too limited", "frustrating",
+]
+
+REVIEW_COMPLAINT_BUCKETS: Dict[str, List[str]] = {
+    "missing_feature": [
+        "missing feature", "doesn't have", "no support for",
+        "wish it had", "need", "lacking",
+    ],
+    "bad_ux": [
+        "confusing", "clunky", "not intuitive", "hard to use",
+        "bad UX", "poor interface", "too many clicks",
+    ],
+    "pricing_mismatch": [
+        "too expensive", "not worth the price", "overpriced",
+        "cheaper alternative", "free tier", "hidden fees",
+    ],
+    "integration_gaps": [
+        "doesn't integrate", "no API", "can't connect",
+        "missing integration", "incompatible", "doesn't work with",
+    ],
+    "performance": [
+        "slow", "crashes", "buggy", "unreliable", "downtime",
+        "laggy", "performance issues",
+    ],
+}
+
+
+def mine_review_platforms(
+    product_keywords: List[str],
+    platforms: Optional[List[str]] = None,
+    results_per_query: int = 8,
+) -> Dict:
+    """
+    Mine 2-3 star reviews from G2, Capterra, App Store and similar platforms.
+
+    Targets the sweet spot: users who care enough to stay but are frustrated
+    enough to complain. Their complaints map directly to startup opportunities.
+
+    Args:
+        product_keywords: Product or category keywords (e.g. ["project management", "CRM"])
+        platforms: Review platforms to search. Defaults to G2, Capterra, TrustRadius,
+                   App Store, ProductHunt.
+        results_per_query: Results per search query (default 8)
+
+    Returns:
+        Dict with categorized review complaints, queries used, and analysis guide
+    """
+    if platforms is None:
+        platforms = ["g2.com", "capterra.com", "trustradius.com",
+                     "producthunt.com", "apps.apple.com"]
+
+    topic = " OR ".join(f'"{kw}"' for kw in product_keywords)
+    complaint_terms = " OR ".join(f'"{t}"' for t in REVIEW_COMPLAINT_KEYWORDS[:6])
+
+    all_results = {}
+    queries_used = []
+
+    # Search each platform for 2-3 star style complaints
+    for platform in platforms:
+        query = f'{topic} site:{platform} ({complaint_terms}) review'
+        results = search_web(query, results_per_query)
+        platform_key = platform.split(".")[0]
+        all_results[platform_key] = results.get("organic", [])
+        queries_used.append({"platform": platform, "query": query})
+
+    # Search by complaint bucket across all platforms
+    bucket_results = {}
+    for bucket, terms in REVIEW_COMPLAINT_BUCKETS.items():
+        bucket_terms = " OR ".join(f'"{t}"' for t in terms[:4])
+        query = f'{topic} ({bucket_terms}) review'
+        results = search_web(query, results_per_query)
+        bucket_results[bucket] = results.get("organic", [])
+        queries_used.append({"bucket": bucket, "query": query})
+
+    # Cross-platform complaint search (most valuable — shared category pain)
+    cross_query = f'{topic} "switched from" OR "moved to" OR "alternative" review comparison'
+    cross_results = search_web(cross_query, results_per_query)
+
+    return {
+        "by_platform": all_results,
+        "by_complaint_bucket": bucket_results,
+        "cross_platform": cross_results.get("organic", []),
+        "queries_used": queries_used,
+        "source": "review_mining",
+        "analysis_guide": {
+            "complaint_buckets": {
+                "missing_feature": "Build the feature as a standalone tool or plugin",
+                "bad_ux": "Rebuild the workflow from scratch for a specific persona",
+                "pricing_mismatch": "Repackage for an underserved segment (freelancers, SMBs)",
+                "integration_gaps": "Build the bridge product or all-in-one for that niche",
+                "performance": "Rebuild with modern infra for the segment that cares most",
+            },
+            "steps": [
+                "1. Categorize each complaint into a bucket (feature, UX, pricing, integration, performance)",
+                "2. Count frequency — same complaint across multiple products = category gap",
+                "3. Cross-reference with Reddit/Twitter to confirm pain exists outside reviews",
+                "4. For each high-frequency complaint, identify: WHO says it (persona), WHAT they switch to (competitor), WHAT perfect looks like (landing page copy)",
+                "5. Prioritize complaints from 2-3 star reviews — these are committed users, not rage-quitters",
+            ],
+        },
+    }
+
+
+###############################################################################
+# Twitter Feed Ideation — Extract startup ideas from builders' public thinking
+# Builders narrate their problem-solving process publicly. Every complaint is
+# a customer discovery interview they didn't know they were giving.
+###############################################################################
+
+BUILDER_SIGNAL_QUERIES: Dict[str, str] = {
+    "frustrations": '"{handle}" ("why is" OR "so hard" OR "frustrated" OR "broken" OR "wish")',
+    "building": '"{handle}" ("building" OR "shipped" OR "launched" OR "working on" OR "side project")',
+    "requests": '"{handle}" ("has anyone built" OR "looking for" OR "need a tool" OR "someone should")',
+    "pricing_ux": '"{handle}" ("changed pricing" OR "new pricing" OR "redesigned" OR "pivot")',
+    "investing": '"{handle}" ("invested in" OR "advising" OR "angel" OR "bet on")',
+    "predictions": '"{handle}" ("2026" OR "next year" OR "future of" OR "betting on" OR "thesis")',
+}
+
+
+def mine_builder_twitter_feed(
+    handle: str,
+    num_results: int = 10,
+    signal_types: Optional[List[str]] = None,
+) -> Dict:
+    """
+    Analyze a builder's Twitter/X feed for startup idea signals.
+
+    Extracts patterns from their public thinking: what they build, what
+    frustrates them, what they keep talking about, and where they see gaps.
+
+    Args:
+        handle: Twitter handle (with or without @)
+        num_results: Results per signal query (default 10)
+        signal_types: Which signals to mine. Defaults to all:
+            frustrations, building, requests, pricing_ux, investing, predictions
+
+    Returns:
+        Dict with signals by type, queries used, and idea generation guide
+    """
+    handle = handle.lstrip("@")
+
+    if signal_types is None:
+        signal_types = list(BUILDER_SIGNAL_QUERIES.keys())
+
+    signals = {}
+    queries_used = []
+
+    for signal_type in signal_types:
+        if signal_type not in BUILDER_SIGNAL_QUERIES:
+            continue
+        template = BUILDER_SIGNAL_QUERIES[signal_type]
+        query = template.format(handle=handle)
+        # Try X-native search first, fall back to web
+        x_query = f"from:{handle} " + {
+            "frustrations": '"why is" OR "so hard" OR "frustrated" OR "broken"',
+            "building": '"building" OR "shipped" OR "launched" OR "working on"',
+            "requests": '"has anyone built" OR "looking for" OR "need a tool"',
+            "pricing_ux": '"pricing" OR "redesigned" OR "pivot"',
+            "investing": '"invested in" OR "advising" OR "angel"',
+            "predictions": '"2026" OR "future of" OR "betting on" OR "thesis"',
+        }.get(signal_type, "")
+
+        x_results = search_x_twitter(x_query, num_results)
+        web_results = search_web(
+            f"site:twitter.com OR site:x.com {query}", num_results
+        )
+
+        signals[signal_type] = {
+            "x_native": x_results.get("tweets", x_results.get("twitter_posts", [])),
+            "web_results": web_results.get("organic", []),
+        }
+        queries_used.append({"signal_type": signal_type, "query": query})
+
+    return {
+        "handle": handle,
+        "signals": signals,
+        "queries_used": queries_used,
+        "source": "twitter_feed_ideation",
+        "analysis_guide": {
+            "signal_interpretation": {
+                "built_a_tool": "The problem was painful enough to spend months on — others feel it too",
+                "complains_about_X": "Unsolved problem, potentially underserved market",
+                "changed_pricing_ux": "Old model was broken — the category likely has the same issue",
+                "asks_has_anyone_built": "Open whitespace they've validated but not pursued",
+                "invests_in_category": "They see momentum before the market does",
+            },
+            "idea_generation": [
+                "Go deeper — solve the root cause they're patching around",
+                "Go wider — does their frustration apply to adjacent markets/personas?",
+                "Go meta — build the infrastructure THEY needed to build their thing",
+                "Go opposite — are they wrong? Contrarian takes = contrarian startups",
+            ],
+            "ranking_criteria": [
+                "Conviction strength: mentioned once vs obsessed for months",
+                "Gap clarity: well-defined problem or vague frustration?",
+                "Build vs buy: would their audience pay or build it themselves?",
+            ],
+        },
+    }
+
+
+###############################################################################
+# Competitor Churn Mining — Find ideas from users actively leaving products
+# Churning users are pre-qualified: they've paid, used deeply, and decided
+# to leave. This is the highest-intent signal you can mine.
+###############################################################################
+
+CHURN_QUERY_TEMPLATES: Dict[str, str] = {
+    "alternatives": '"alternatives to {product}" site:reddit.com',
+    "switched_from": '"switched from {product} to" site:reddit.com',
+    "cancelling": '("cancelled {product}" OR "canceling {product}" OR "canceled {product}")',
+    "leaving": '("done with {product}" OR "leaving {product}" OR "left {product}")',
+    "migration": '"{product} vs" OR "{product} alternative" OR "replacing {product}"',
+    "segment_specific": '"{product} alternative" ("for small team" OR "for freelancers" OR "for startups" OR "self-hosted")',
+}
+
+CHURN_REASON_BUCKETS: Dict[str, str] = {
+    "price_increase": "Build for the segment they abandoned (freelancers, small teams)",
+    "missing_feature": "Build a focused product that nails that one thing",
+    "complexity_bloat": "Build the simpler version for a specific persona",
+    "bad_support": "Same product, better relationship (white-glove for a niche)",
+    "acquired_sunset": "Orphaned users with no home — direct replacement play",
+    "platform_shift": "Build native for the ecosystem they're moving to",
+}
+
+
+def mine_competitor_churn(
+    competitor_names: List[str],
+    results_per_query: int = 8,
+) -> Dict:
+    """
+    Mine churn signals for competitors — find users actively leaving products.
+
+    Targets the highest-intent signal: people who paid, used deeply, and
+    decided to switch. Their reasons map directly to startup opportunities.
+
+    Args:
+        competitor_names: List of competitor product names (e.g. ["Notion", "Asana"])
+        results_per_query: Results per search query (default 8)
+
+    Returns:
+        Dict with churn signals per competitor, migration paths, and analysis guide
+    """
+    competitor_churn = {}
+    queries_used = []
+
+    for product in competitor_names:
+        product_signals = {}
+
+        for signal_type, template in CHURN_QUERY_TEMPLATES.items():
+            query = template.format(product=product)
+            results = search_web(query, results_per_query)
+            product_signals[signal_type] = results.get("organic", [])
+            queries_used.append({
+                "product": product,
+                "signal_type": signal_type,
+                "query": query,
+            })
+
+        competitor_churn[product] = product_signals
+
+    # Cross-competitor: search for category-wide churn (strongest signal)
+    if len(competitor_names) >= 2:
+        category_query = " OR ".join(
+            f'"alternative to {p}"' for p in competitor_names[:5]
+        )
+        category_results = search_web(
+            f"({category_query}) site:reddit.com", results_per_query
+        )
+    else:
+        category_results = {"organic": []}
+
+    # Google Trends for "[product] alternative" — rising = growing churn wave
+    trends_queries = {}
+    for product in competitor_names[:3]:
+        trend_query = f'"{product} alternative" trends interest'
+        trends_queries[product] = search_web(trend_query, 5).get("organic", [])
+
+    return {
+        "by_competitor": competitor_churn,
+        "category_wide_churn": category_results.get("organic", []),
+        "alternative_trends": trends_queries,
+        "queries_used": queries_used,
+        "source": "churn_mining",
+        "analysis_guide": {
+            "churn_reason_opportunities": CHURN_REASON_BUCKETS,
+            "steps": [
+                "1. Categorize each churn reason (price, feature, complexity, support, sunset, platform)",
+                "2. Map migration paths: where are they going, where NOT going (= gaps), what they settle for",
+                "3. Validate scale: same churn pattern across 3-5 competitors = category problem, not product problem",
+                "4. Check Google Trends for '[product] alternative' — rising = growing churn wave",
+                "5. Look for cobbled-together solutions (spreadsheets, Zapier chains) = unbundling opportunity",
+            ],
+        },
+    }
+
+
 def search_customer_pain_points(problem: str, industry: str = None) -> Dict:
     """
     Search for customer pain points and complaints.

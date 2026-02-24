@@ -44,6 +44,23 @@ Think from first principles. Decompose every score into its components and justi
 - Include customer complaint quotes from G2/Reddit
 - Format: `> "Quote" — Source, Date`
 
+### Part 1b: Competitor Churn Analysis
+- Use `mine_competitor_churn()` to find users actively leaving competitors
+- Churning users are the highest-intent signal: they've paid, used deeply, and decided to switch
+- Map each competitor's churn patterns:
+  - **Where users go** — the common destination reveals what the market values
+  - **Where users DON'T go** — gaps no competitor fills yet (your opportunity)
+  - **What users settle for** — "it's not perfect but..." = your feature roadmap
+  - **What users cobble together** — spreadsheets, Zapier chains = unbundling opportunity
+- Validate scale: same churn reason across 3-5 competitors = category problem, not product problem
+- Check if `"[product] alternative"` is rising in search trends — indicates accelerating churn
+
+### Part 1c: Twitter/X Builder Signal Analysis (when relevant builders identified)
+- Use `mine_builder_twitter_feed()` for key builders/founders in the space
+- Extract signals: what they build (validated pain), what frustrates them (unsolved problems), what they ask audiences ("has anyone built X?" = open whitespace)
+- Pricing/UX changes they announce signal broken category norms
+- Generate ideas by going deeper (root cause), wider (adjacent markets), meta (infrastructure), or opposite (contrarian)
+
 ### Part 2: Technical Feasibility
 - Recommend technology stack
 - Identify required integrations
@@ -259,6 +276,8 @@ client.add(f"Session {session_id} feasibility_scorer phase complete", user_id=us
 Your analysis is complete when you have:
 - [ ] Analyzed 5+ competitors with strengths/weaknesses
 - [ ] Created competitive matrix
+- [ ] Mined competitor churn signals using `mine_competitor_churn()`
+- [ ] Mapped migration paths and identified underserved gaps
 - [ ] Identified market gaps and advantages
 - [ ] Recommended tech stack
 - [ ] Estimated team requirements

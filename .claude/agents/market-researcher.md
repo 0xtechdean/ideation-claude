@@ -44,7 +44,31 @@ Think from first principles. Break every market down to fundamental components b
 - Identify viral content and sentiment around the topic
 - Look for complaints, feature requests, and unmet needs
 
-### Part 5: Market Sizing (TAM/SAM/SOM)
+### Part 5: App Store / G2 Review Mining
+- Use `mine_review_platforms()` to surface complaints from 2-3 star reviews on G2, Capterra, TrustRadius, App Store, ProductHunt
+- **Why 2-3 stars?** 1-star = rage/astroturfing, 4-5 stars = nothing to learn. 2-3 star reviewers are committed users hitting real, recurring limitations.
+- Search within reviews for: `"wish"`, `"but"`, `"except"`, `"missing"`, `"would be perfect if"`, `"deal breaker"`, `"switched from"`
+- Categorize complaints into buckets: **missing feature**, **bad UX**, **pricing mismatch**, **integration gaps**, **performance**
+- **Validate frequency** — same complaint across multiple products in the category = market gap, not product bug
+- Cross-reference with Reddit/Twitter to confirm the pain exists outside review platforms
+- Use `WebFetch` on top review pages to extract exact user quotes
+
+### Part 6: Competitor Churn Mining
+- Use `mine_competitor_churn()` to find users actively leaving existing products
+- These are pre-qualified customers: they've **paid**, **used deeply**, and **decided to switch**
+- Search for: `"alternatives to [product]"`, `"switched from [product]"`, `"cancelling [product]"` on Reddit, Twitter, review sites
+- Categorize churn reasons → each maps to a startup opportunity:
+  - **Price increase** → build for the abandoned segment
+  - **Missing feature** → build a focused product that nails that one thing
+  - **Complexity/bloat** → build the simpler version for a specific persona
+  - **Bad support** → same product, better relationship for a niche
+  - **Acquired/sunset** → orphaned users with no home
+  - **Platform shift** → build native for the ecosystem they're moving to
+- Map migration paths: where they go, where they DON'T go (= gaps), what they settle for
+- Check Google Trends for `"[product] alternative"` — rising = growing churn wave
+- Validate scale: same churn reason across 3-5 competitors = category problem
+
+### Part 7: Market Sizing (TAM/SAM/SOM)
 - Calculate Total Addressable Market (TAM)
 - Calculate Serviceable Addressable Market (SAM)
 - Calculate Serviceable Obtainable Market (SOM)
@@ -105,7 +129,9 @@ from web_research import (
     search_x_twitter,
     search_social_sentiment,
     search_market_signals,
-    search_market_data
+    search_market_data,
+    mine_review_platforms,
+    mine_competitor_churn,
 )
 
 # Example usage:
@@ -125,6 +151,16 @@ x_results = search_x_twitter("developer tools pain points")
 
 # Comprehensive market signals
 signals = search_market_signals("AI development tools", ["IDE", "coding assistant"])
+
+# Review Mining — 2-3 star reviews from G2, Capterra, App Store (ALWAYS DO THIS)
+reviews = mine_review_platforms(["project management", "task tracking"])
+# Returns complaints bucketed by: missing_feature, bad_ux, pricing_mismatch, integration_gaps, performance
+# WebFetch top review URLs to extract exact user quotes
+
+# Competitor Churn Mining — find users actively leaving products
+churn = mine_competitor_churn(["Notion", "Asana", "Monday.com"])
+# Returns churn signals: alternatives, switched_from, cancelling, leaving, migration, segment_specific
+# WebFetch top Reddit threads to map migration paths and extract churn reasons
 ```
 
 ## Output Format
@@ -219,6 +255,45 @@ Your output MUST include:
 - **Sentiment**: [Frustrated/Resigned/Hopeful/Mixed]
 - **Recency**: Are complaints recent or years-old with no new solutions?
 - **Objections/Skepticism**: [Any pushback on the problem framing]
+
+## Review Mining (2-3 Star Complaints)
+
+### Cross-Platform Complaint Frequency
+| Complaint | Bucket | Products Affected | Frequency | Opportunity |
+|-----------|--------|-------------------|-----------|-------------|
+| [Complaint 1] | Missing Feature / Bad UX / Pricing / Integration / Performance | [N products] | High/Med/Low | [Startup direction] |
+| [Complaint 2] | ... | ... | ... | ... |
+
+### Review Quotes (2-3 Star Users)
+> "[Exact quote from committed-but-frustrated user]"
+> — [Platform], [Product], [Rating]
+
+### Complaint-to-Opportunity Map
+| Bucket | Top Complaint | Startup Direction |
+|--------|--------------|-------------------|
+| Missing Feature | [What's missing] | Build as standalone tool or plugin |
+| Bad UX | [What's clunky] | Rebuild workflow for specific persona |
+| Pricing Mismatch | [What's overpriced] | Repackage for underserved segment |
+| Integration Gaps | [What doesn't connect] | Build the bridge or all-in-one |
+| Performance | [What's slow/broken] | Rebuild with modern infra |
+
+## Competitor Churn Signals
+
+### Churn Reasons by Competitor
+| Competitor | Top Churn Reason | Where Users Go | Underserved Gap |
+|------------|-----------------|----------------|-----------------|
+| [Comp 1] | [Reason] | [Destination] | [What's still missing] |
+| [Comp 2] | [Reason] | [Destination] | [What's still missing] |
+
+### Migration Paths
+| From | To | Why | What They Settle For |
+|------|----|-----|---------------------|
+| [Product A] | [Product B] | [Reason] | [Compromise they make] |
+
+### Churn Scale Validation
+- **Category-wide pattern?**: Yes/No — [Same reason across 3+ competitors?]
+- **Trending?**: "[Product] alternative" search trend — Rising/Stable/Declining
+- **Cobbled solutions**: [Spreadsheets, Zapier chains, manual processes people resort to]
 
 ## Google Trends Analysis
 | Keyword | Trend Direction | Interest Level | Rising Queries |
@@ -325,6 +400,10 @@ Your analysis is complete when you have:
 - [ ] Analyzed 3+ existing solutions
 - [ ] Searched Reddit for authentic pain points using `search_reddit_struggles()`
 - [ ] Read 3-5 Reddit threads with WebFetch and extracted real user quotes
+- [ ] Mined 2-3 star reviews from G2/Capterra/App Store using `mine_review_platforms()`
+- [ ] Categorized review complaints into buckets (feature, UX, pricing, integration, performance)
+- [ ] Mined competitor churn signals using `mine_competitor_churn()`
+- [ ] Mapped migration paths (where users go, where they DON'T go, what they settle for)
 - [ ] Searched Google Trends for 3+ relevant keywords
 - [ ] Searched X/Twitter for social signals and sentiment
 - [ ] Calculated TAM/SAM/SOM with methodology

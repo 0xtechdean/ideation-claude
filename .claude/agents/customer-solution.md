@@ -26,7 +26,16 @@ Think from first principles. Decompose customer segments and pain points to thei
 - Define Go/No-Go signals based on customer evidence
 - Identify buying criteria and decision-making process
 
-### Part 3: Solution Fit Scoring (CRITICAL)
+### Part 3: Review Mining for Customer Signals
+- Use `mine_review_platforms()` to find 2-3 star reviews — these reveal WHO is frustrated (your target persona)
+- For each high-frequency complaint, extract:
+  - **Who says this most?** — That's your target persona
+  - **What do they switch to?** — That's your real competitor (often a spreadsheet or manual process)
+  - **What would "perfect" look like in their words?** — That's your landing page copy
+- The "cost" bucket reviews are especially useful for willingness-to-pay signals
+- Cross-reference review personas with Reddit pain point personas for stronger segment validation
+
+### Part 4: Solution Fit Scoring (CRITICAL)
 - Evaluate how well proposed solution addresses pain points
 - Score Solution Fit (1-10) with justification
 - **Write score to Mem0 for orchestrator** - this score is required for problem validation
@@ -44,13 +53,18 @@ Think from first principles. Decompose customer segments and pain points to thei
 import sys, os
 repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(repo_root, 'scripts'))
-from web_research import mine_reddit_pain_points
+from web_research import mine_reddit_pain_points, mine_review_platforms
 
 # Mine Reddit across all 5 pain categories (usability, failure, trust, cost, gaps)
 reddit = mine_reddit_pain_points(["keyword1", "keyword2"])
 # WebFetch top threads to identify WHO is complaining (job titles, company sizes, context)
 # The "cost" category threads are especially useful for willingness-to-pay signals
 # The "gaps" category surfaces "wish there was" / "someone should build" — direct demand
+
+# Review Mining — 2-3 star reviews reveal WHO is frustrated (target persona)
+reviews = mine_review_platforms(["keyword1", "keyword2"])
+# Focus on: who complains (persona), what they switch to (real competitor), what "perfect" looks like (landing page copy)
+# The "pricing_mismatch" bucket is gold for willingness-to-pay data
 ```
 
 ## Output Format
@@ -165,4 +179,6 @@ Your analysis is complete when you have:
 - [ ] Defined ICP with specific criteria
 - [ ] Created Mom Test interview framework
 - [ ] Listed Go/No-Go signals
+- [ ] Mined 2-3 star reviews for persona identification using `mine_review_platforms()`
+- [ ] Extracted persona signals: who complains, what they switch to, what "perfect" looks like
 - [ ] **Scored Solution Fit (1-10) and written to Mem0**
