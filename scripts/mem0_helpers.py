@@ -71,7 +71,7 @@ def get_user_id(agent_name: str, session_id: str) -> str:
     return f"ideation_{agent_name}_{session_id}"
 
 
-def initialize_session(session_id: str, problem: str, threshold: float = 5.0, api_key: str = None) -> bool:
+def initialize_session(session_id: str, problem: str, threshold: float = 6.0, api_key: str = None) -> bool:
     """
     Initialize a new evaluation session.
 
@@ -318,6 +318,8 @@ def get_score(session_id: str, phase: str = "problem", api_key: str = None) -> O
         Score as float, or None if not found
     """
     client = get_client(api_key)
+    # Problem scores are written by feasibility_scorer after consolidating
+    # all agent outputs; solution scores are also written by feasibility_scorer.
     user_id = get_user_id("feasibility_scorer", session_id)
 
     # Use search with filters (required by Mem0 v2 API)
@@ -332,7 +334,8 @@ def get_score(session_id: str, phase: str = "problem", api_key: str = None) -> O
 
     for result in results:
         metadata = result.get("metadata", {})
-        if metadata.get("type") == "scoring_decision":
+        if (metadata.get("type") == "scoring_decision"
+                and metadata.get("phase") == phase):
             return metadata.get("score")
 
     return None

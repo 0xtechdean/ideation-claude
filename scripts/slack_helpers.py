@@ -262,8 +262,12 @@ def send_full_report(
     channel = channel_id or SLACK_CHANNEL_ID
 
     # Read the report
-    with open(report_path, "r") as f:
-        content = f.read()
+    try:
+        with open(report_path, "r") as f:
+            content = f.read()
+    except FileNotFoundError:
+        return {"ok": False, "messages_sent": 0, "total_chunks": 0,
+                "errors": [f"Report file not found: {report_path}"]}
 
     # Convert to Slack format
     slack_content = markdown_to_slack(content)
@@ -327,13 +331,21 @@ def post_message(text: str, channel_id: str = None, blocks: list = None) -> Dict
     if blocks:
         payload["blocks"] = blocks
 
-    response = requests.post(
-        "https://slack.com/api/chat.postMessage",
-        headers=headers,
-        json=payload
-    )
-
-    return response.json()
+    try:
+        response = requests.post(
+            "https://slack.com/api/chat.postMessage",
+            headers=headers,
+            json=payload,
+            timeout=30
+        )
+        response.raise_for_status()
+        return response.json()
+    except requests.Timeout:
+        return {"ok": False, "error": "Request timed out"}
+    except requests.HTTPError as e:
+        return {"ok": False, "error": f"HTTP error: {e.response.status_code}"}
+    except requests.RequestException as e:
+        return {"ok": False, "error": f"Request failed: {str(e)}"}
 
 
 def format_evaluation_report(
