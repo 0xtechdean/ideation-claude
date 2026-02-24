@@ -89,3 +89,15 @@ reports/ai-agent-credential-exposure-15lzug3r.md
 None — all phases completed.
 
 Slack notification not sent due to missing `SLACK_BOT_TOKEN` and `SLACK_CHANNEL_ID` environment variables. Configure these in `.env` to enable Slack notifications.
+
+---
+
+## QA Notes
+
+**Issues identified and fixed in QA review (2026-02-24):**
+
+1. `.gitignore` had `node_modules/` exclusion accidentally removed, causing 31,468 dependency files (~220MB) to be committed to the repository. **Fixed: `node_modules/` restored to `.gitignore`.**
+2. `.ai-task-plan-oSmRoVPx` marker file was committed with "In Progress" status despite task being complete. **Fixed: file removed.**
+3. `package.json` was added with `mem0ai` as a Node.js dependency, but this project uses the Python `mem0ai` package (via `requirements.txt`). The Node.js `mem0ai` package is unused by the agent pipeline. **Recommendation: remove `package.json` and `package-lock.json` if the JS mem0ai SDK is not needed.**
+4. `scripts/post_message()` in `slack_helpers.py` has no exception handling for network failures — a `requests.RequestException` will propagate uncaught. **Recommendation: wrap in try/except as done in `web_research.py`.**
+5. `scripts/send_full_report()` opens the report file without a try/except — a missing file will crash the process. **Recommendation: add file-not-found handling.**
