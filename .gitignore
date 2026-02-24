@@ -12,6 +12,9 @@
 .DS_Store
 Thumbs.db
 
+# Dependencies
+node_modules/
+
 # Output
 output/
 reports/
