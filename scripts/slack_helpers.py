@@ -39,9 +39,9 @@ def load_slack_credentials() -> tuple:
                     for line in f:
                         line = line.strip()
                         if line.startswith("SLACK_BOT_TOKEN=") and not bot_token:
-                            bot_token = line.split("=", 1)[1].strip()
+                            bot_token = line.split("=", 1)[1].strip().strip('"').strip("'")
                         elif line.startswith("SLACK_CHANNEL_ID=") and not channel_id:
-                            channel_id = line.split("=", 1)[1].strip()
+                            channel_id = line.split("=", 1)[1].strip().strip('"').strip("'")
                 break
 
     return bot_token, channel_id
@@ -262,8 +262,13 @@ def send_full_report(
     channel = channel_id or SLACK_CHANNEL_ID
 
     # Read the report
-    with open(report_path, "r") as f:
-        content = f.read()
+    try:
+        with open(report_path, "r") as f:
+            content = f.read()
+    except FileNotFoundError:
+        return {"ok": False, "error": f"Report file not found: {report_path}", "messages_sent": 0}
+    except OSError as e:
+        return {"ok": False, "error": f"Failed to read report: {e}", "messages_sent": 0}
 
     # Convert to Slack format
     slack_content = markdown_to_slack(content)
@@ -327,13 +332,17 @@ def post_message(text: str, channel_id: str = None, blocks: list = None) -> Dict
     if blocks:
         payload["blocks"] = blocks
 
-    response = requests.post(
-        "https://slack.com/api/chat.postMessage",
-        headers=headers,
-        json=payload
-    )
-
-    return response.json()
+    try:
+        response = requests.post(
+            "https://slack.com/api/chat.postMessage",
+            headers=headers,
+            json=payload,
+            timeout=30
+        )
+        response.raise_for_status()
+        return response.json()
+    except requests.RequestException as e:
+        return {"ok": False, "error": str(e)}
 
 
 def format_evaluation_report(
