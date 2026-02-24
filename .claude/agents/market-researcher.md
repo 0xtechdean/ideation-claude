@@ -27,13 +27,24 @@ Think from first principles. Break every market down to fundamental components b
 - Compare trending topics in the problem space
 - Find seasonal patterns or growth trajectories
 
-### Part 3: X (Twitter) Social Signals
+### Part 3: Reddit Pain Point Mining (REQUIRED)
+- Use `mine_reddit_pain_points()` to run targeted queries across 5 pain categories: **usability**, **failure**, **trust**, **cost**, **gaps**
+- Each category generates a separate Google dork — this surfaces different sub-problems
+- Use `WebFetch` to read the top 3-5 Reddit threads and pull exact user quotes
+- **Cluster complaints** — group similar frustrations across threads
+- **Count frequency** — problems mentioned by many people = larger market
+- **Note workarounds** — DIY solutions people cobble together = proof of willingness to pay
+- **Check recency** — old complaints with no new solutions = stale market gap
+- **Find the quote** — save vivid user quotes (potential landing page copy)
+- Note subreddits where the problem is discussed (signals community size)
+
+### Part 4: X (Twitter) Social Signals
 - Search X/Twitter for discussions about the problem
 - Find influential voices and thought leaders talking about this
 - Identify viral content and sentiment around the topic
 - Look for complaints, feature requests, and unmet needs
 
-### Part 4: Market Sizing (TAM/SAM/SOM)
+### Part 5: Market Sizing (TAM/SAM/SOM)
 - Calculate Total Addressable Market (TAM)
 - Calculate Serviceable Addressable Market (SAM)
 - Calculate Serviceable Obtainable Market (SOM)
@@ -43,10 +54,11 @@ Think from first principles. Break every market down to fundamental components b
 
 1. **Use WebSearch extensively** to gather real market data
 2. **Search Google Trends** for keyword interest and rising queries
-3. **Search X/Twitter** for social signals and sentiment
-4. **Find specific numbers** - market sizes, growth rates, statistics
-5. **Cite sources** for all data points
-6. **Be quantitative** - avoid vague statements
+3. **Search Reddit** using `search_reddit_struggles()` for authentic user pain points — then **WebFetch the top threads** to extract exact quotes
+4. **Search X/Twitter** for social signals and sentiment
+5. **Find specific numbers** - market sizes, growth rates, statistics
+6. **Cite sources** for all data points
+7. **Be quantitative** - avoid vague statements
 
 ## Source Quality Requirements
 
@@ -87,6 +99,8 @@ import sys
 repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(repo_root, 'scripts'))
 from web_research import (
+    mine_reddit_pain_points,
+    search_reddit_struggles,
     search_google_trends,
     search_x_twitter,
     search_social_sentiment,
@@ -95,6 +109,14 @@ from web_research import (
 )
 
 # Example usage:
+# Full Reddit pain-point mining across all 5 categories (ALWAYS DO THIS)
+reddit = mine_reddit_pain_points(["legal research", "small law firms"])
+# Returns threads grouped by: usability, failure, trust, cost, gaps
+# Then use WebFetch on the top thread URLs to read full discussions and extract quotes
+
+# Or target a specific pain category:
+reddit_cost = search_reddit_struggles(["legal research"], pain_category="cost")
+
 # Google Trends for keywords
 trends = search_google_trends(["AI coding assistant", "developer productivity"])
 
@@ -157,6 +179,46 @@ Your output MUST include:
 | Enterprise | $X | X% |
 | Mid-Market | $X | X% |
 | SMB | $X | X% |
+
+## Reddit Pain Points (Authentic User Voices)
+
+### Pain by Category
+| Category | Threads Found | Top Pain Point | Frequency |
+|----------|--------------|----------------|-----------|
+| Usability | [N] | [Most common usability complaint] | [High/Med/Low] |
+| Failure | [N] | [Most common failure/breakage] | [High/Med/Low] |
+| Trust | [N] | [Most common trust concern] | [High/Med/Low] |
+| Cost | [N] | [Most common cost complaint] | [High/Med/Low] |
+| Gaps | [N] | [Most requested missing feature/tool] | [High/Med/Low] |
+
+### Key Threads Analyzed
+| Subreddit | Thread Title | Category | Key Pain Point |
+|-----------|-------------|----------|----------------|
+| r/[sub] | [Title] | [cat] | [Pain point summary] |
+| r/[sub] | [Title] | [cat] | [Pain point summary] |
+
+### Real User Quotes
+> "[Exact quote from Reddit user describing their pain]"
+> — u/[username], r/[subreddit], [link]
+
+> "[Another authentic quote]"
+> — u/[username], r/[subreddit], [link]
+
+> "[Quote showing workaround or current solution]"
+> — u/[username], r/[subreddit], [link]
+
+### Workarounds & DIY Solutions
+| Workaround | How Common | What It Signals |
+|------------|-----------|-----------------|
+| [What users do instead] | [Many/Some/Few] | [Willingness to pay / severity] |
+
+### Reddit Signal Summary
+- **Problem Confirmed?**: Yes/No/Partially — [explanation]
+- **Strongest Pain Category**: [Which of the 5 categories had most signal]
+- **Frequency**: How often is this discussed? [Daily/Weekly/Monthly/Rare]
+- **Sentiment**: [Frustrated/Resigned/Hopeful/Mixed]
+- **Recency**: Are complaints recent or years-old with no new solutions?
+- **Objections/Skepticism**: [Any pushback on the problem framing]
 
 ## Google Trends Analysis
 | Keyword | Trend Direction | Interest Level | Rising Queries |
@@ -261,6 +323,8 @@ Your analysis is complete when you have:
 - [ ] Identified 3+ market trends with evidence
 - [ ] Ranked 5+ pain points by severity
 - [ ] Analyzed 3+ existing solutions
+- [ ] Searched Reddit for authentic pain points using `search_reddit_struggles()`
+- [ ] Read 3-5 Reddit threads with WebFetch and extracted real user quotes
 - [ ] Searched Google Trends for 3+ relevant keywords
 - [ ] Searched X/Twitter for social signals and sentiment
 - [ ] Calculated TAM/SAM/SOM with methodology
