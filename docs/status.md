@@ -99,5 +99,7 @@ Slack notification not sent due to missing `SLACK_BOT_TOKEN` and `SLACK_CHANNEL_
 1. `.gitignore` had `node_modules/` exclusion accidentally removed, causing 31,468 dependency files (~220MB) to be committed to the repository. **Fixed: `node_modules/` restored to `.gitignore`.**
 2. `.ai-task-plan-oSmRoVPx` marker file was committed with "In Progress" status despite task being complete. **Fixed: file removed.**
 3. `package.json` was added with `mem0ai` as a Node.js dependency, but this project uses the Python `mem0ai` package (via `requirements.txt`). The Node.js `mem0ai` package is unused by the agent pipeline. **Recommendation: remove `package.json` and `package-lock.json` if the JS mem0ai SDK is not needed.**
-4. `scripts/post_message()` in `slack_helpers.py` has no exception handling for network failures — a `requests.RequestException` will propagate uncaught. **Recommendation: wrap in try/except as done in `web_research.py`.**
-5. `scripts/send_full_report()` opens the report file without a try/except — a missing file will crash the process. **Recommendation: add file-not-found handling.**
+4. `scripts/post_message()` in `slack_helpers.py` had no exception handling for network failures — a `requests.RequestException` would propagate uncaught. **Fixed: wrapped in try/except, added 30s timeout.**
+5. `scripts/send_full_report()` opened the report file without a try/except — a missing file would crash the process. **Fixed: added FileNotFoundError and OSError handling.**
+6. `.env` loading in `slack_helpers.py` did not strip quotes from values (unlike `web_research.py` and `mem0_helpers.py`) — `SLACK_BOT_TOKEN="xoxb-..."` would include literal quotes. **Fixed: added `.strip('"').strip("'")`.**
+7. `scripts/mem0_helpers.py:initialize_session()` defaulted `threshold=5.0` while `CLAUDE.md` and `analysis_tools.py` both use `6.0`. **Fixed: corrected default to 6.0.**
