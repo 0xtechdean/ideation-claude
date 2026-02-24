@@ -178,36 +178,85 @@ def search_pricing_data(product_type: str, industry: str = None) -> Dict:
     }
 
 
-def _build_reddit_dork(keywords: List[str]) -> str:
+# Pain keyword categories for Reddit mining.
+# Each category targets a different type of frustration.
+PAIN_CATEGORIES: Dict[str, List[str]] = {
+    "usability": [
+        "confusing", "not user friendly", "bad UI", "too complicated",
+        "overwhelming", "hard to use", "unintuitive",
+    ],
+    "failure": [
+        "doesn't work", "broken", "lost money", "mistake",
+        "frustration", "not working", "failed", "gave up",
+    ],
+    "trust": [
+        "scam", "hacked", "risky", "no transparency",
+        "sketchy", "shady", "don't trust",
+    ],
+    "cost": [
+        "too expensive", "fees too high", "not worth it",
+        "overpriced", "waste of money", "can't afford",
+    ],
+    "gaps": [
+        "no good tool", "where do I start", "what I wish I knew",
+        "nobody built", "wish there was", "why isn't there",
+        "someone should build",
+    ],
+}
+
+FIRST_PERSON_FILTERS: List[str] = [
+    "I think", "my experience", "I realized", "I learned",
+    "my biggest struggle", "I found that", "IMO",
+    "I've been", "I was", "my biggest fear",
+]
+
+
+def _build_reddit_dork(
+    keywords: List[str],
+    pain_category: Optional[str] = None,
+) -> str:
     """
     Build a Google search dork that surfaces authentic first-person
     struggles and pain points from Reddit comment threads.
 
+    Uses the Reddit Pain-Point Mining technique: topic keywords +
+    first-person language filters + categorized pain keywords.
+
     Args:
         keywords: Topic keywords (e.g., ["legal research", "small law firms"])
+        pain_category: Optional specific category to target. One of:
+            "usability", "failure", "trust", "cost", "gaps".
+            If None, uses a broad mix across all categories.
 
     Returns:
         Google dork query string targeting Reddit pain discussions
     """
     topic = " OR ".join(f'"{kw}"' for kw in keywords)
 
-    first_person = (
-        '"I think" OR "I feel" OR "I was" OR "I\'ve been" OR "I have been" '
-        'OR "my experience" OR "IMO" OR "I realized" OR "I learned" '
-        'OR "my biggest struggle" OR "my biggest fear" OR "I found that"'
-    )
+    first_person = " OR ".join(f'"{fp}"' for fp in FIRST_PERSON_FILTERS)
 
-    struggle = (
-        '"struggle" OR "problem" OR "issue" OR "challenge" '
-        'OR "difficulty" OR "frustration" OR "concern" '
-        'OR "obstacle" OR "barrier" OR "what I wish I knew" '
-        'OR "what I regret" OR "doesn\'t work" OR "not working"'
-    )
+    if pain_category and pain_category in PAIN_CATEGORIES:
+        pain_words = PAIN_CATEGORIES[pain_category]
+    else:
+        # Broad mix: pick representative words from each category
+        pain_words = [
+            "confusing", "too complicated",          # usability
+            "doesn't work", "frustration",            # failure
+            "scam", "risky",                          # trust
+            "too expensive", "not worth it",          # cost
+            "no good tool", "what I wish I knew",     # gaps
+        ]
 
-    return f"{topic} site:reddit.com inurl:comments ({first_person}) ({struggle})"
+    pain = " OR ".join(f'"{pw}"' for pw in pain_words)
+
+    return f"{topic} site:reddit.com inurl:comments ({first_person}) ({pain})"
 
 
-def search_reddit_struggles(keywords: List[str], num_results: int = 10) -> Dict:
+def search_reddit_struggles(
+    keywords: List[str],
+    num_results: int = 10,
+    pain_category: Optional[str] = None,
+) -> Dict:
     """
     Search Reddit for authentic first-person pain points using targeted
     Google dork that filters for real user experiences in comment threads.
@@ -215,17 +264,82 @@ def search_reddit_struggles(keywords: List[str], num_results: int = 10) -> Dict:
     Args:
         keywords: Topic keywords to search for (1-3 phrases work best)
         num_results: Number of results to return
+        pain_category: Optional pain category to focus on. One of:
+            "usability", "failure", "trust", "cost", "gaps".
+            If None, uses a broad mix.
 
     Returns:
         Dict with Reddit pain point threads and the query used
     """
-    query = _build_reddit_dork(keywords)
+    query = _build_reddit_dork(keywords, pain_category)
     results = search_web(query, num_results)
 
     return {
         "threads": results.get("organic", []),
         "query_used": query,
-        "source": "reddit_dork"
+        "pain_category": pain_category or "broad",
+        "source": "reddit_dork",
+    }
+
+
+def mine_reddit_pain_points(
+    keywords: List[str],
+    categories: Optional[List[str]] = None,
+    results_per_category: int = 5,
+) -> Dict:
+    """
+    Full Reddit pain-point mining: run multiple targeted queries across
+    pain categories, then return structured results for analysis.
+
+    This implements the multi-query approach: for each pain category,
+    a separate dork is built so results target different sub-problems.
+
+    Args:
+        keywords: Topic keywords (e.g., ["crypto wallet", "seed phrase"])
+        categories: Pain categories to mine. Defaults to all five:
+            ["usability", "failure", "trust", "cost", "gaps"].
+        results_per_category: Results per category query (default 5)
+
+    Returns:
+        Dict with per-category threads, all queries used, and
+        analysis prompts for downstream agents.
+    """
+    if categories is None:
+        categories = list(PAIN_CATEGORIES.keys())
+
+    category_results = {}
+    queries_used = []
+
+    for cat in categories:
+        if cat not in PAIN_CATEGORIES:
+            continue
+        result = search_reddit_struggles(keywords, results_per_category, cat)
+        category_results[cat] = result.get("threads", [])
+        queries_used.append({"category": cat, "query": result.get("query_used", "")})
+
+    # Flatten all threads for easy iteration
+    all_threads = []
+    for cat, threads in category_results.items():
+        for thread in threads:
+            thread["pain_category"] = cat
+            all_threads.append(thread)
+
+    return {
+        "by_category": category_results,
+        "all_threads": all_threads,
+        "queries_used": queries_used,
+        "total_threads": len(all_threads),
+        "categories_searched": categories,
+        "source": "reddit_mining",
+        "analysis_guide": {
+            "steps": [
+                "1. Cluster complaints — group similar frustrations across threads",
+                "2. Count frequency — problems mentioned by many people = larger market",
+                "3. Note workarounds — DIY solutions = proof of willingness to pay",
+                "4. Check recency — old complaints with no new solutions = stale market gap",
+                "5. Find the quote — save vivid user quotes as future landing page copy",
+            ],
+        },
     }
 
 
@@ -258,7 +372,7 @@ def search_customer_pain_points(problem: str, industry: str = None) -> Dict:
         "challenges": search_web(queries[0], 10),
         "complaints": search_web(queries[1], 10),
         "feedback": search_web(queries[2], 10),
-        "reddit_struggles": search_reddit_struggles(reddit_keywords)
+        "reddit_mining": mine_reddit_pain_points(reddit_keywords)
     }
 
     return results
