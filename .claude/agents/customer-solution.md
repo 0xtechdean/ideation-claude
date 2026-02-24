@@ -1,7 +1,7 @@
 ---
 name: customer-solution
 description: Customer discovery and MVP design expert. PROACTIVELY identifies customer segments, creates Mom Test interview frameworks, and designs MVP features for startup validation. Use after market research is complete.
-tools: Read, Grep, Glob, WebSearch, WebFetch, Bash
+tools: Read, Grep, Glob, WebSearch, WebFetch, Bash, mcp__playwright__browser_navigate, mcp__playwright__browser_snapshot, mcp__playwright__browser_click, mcp__playwright__browser_scroll_down, mcp__playwright__browser_scroll_up, mcp__playwright__browser_go_back
 model: opus
 ---
 
@@ -43,21 +43,38 @@ Think from first principles. Decompose customer segments and pain points to thei
 ## How to Execute
 
 1. **Read market research first** if available (from market-researcher agent)
-2. **Search Reddit** using `search_reddit_struggles()` for real user pain points — then **WebFetch the top threads** to understand who these people are (job titles, company sizes, context)
+2. **Browse Reddit with Playwright MCP** — use `build_reddit_search_urls()` to generate URLs, then `browser_navigate` + `browser_snapshot` to browse `old.reddit.com` threads and identify WHO is complaining (job titles, company sizes, context). Focus on "cost" category threads for willingness-to-pay signals and "gaps" category for direct demand. See `reddit-browser-protocol.md` for detailed steps. Fallback: `search_reddit_struggles()` + `WebFetch` on `old.reddit.com` URLs.
 3. **Use WebSearch** to find customer data, forums, reviews
 4. **Be specific** about customer characteristics and budgets
 5. **Prioritize ruthlessly** - MVP means minimum!
 
-### Reddit Customer Discovery
+### Reddit Customer Discovery (Playwright MCP — Primary Method)
 ```python
 import sys, os
 repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(repo_root, 'scripts'))
-from web_research import mine_reddit_pain_points, mine_review_platforms
+from web_research import (
+    mine_reddit_pain_points, mine_review_platforms,
+    build_reddit_search_urls, suggest_subreddits,
+)
 
-# Mine Reddit across all 5 pain categories (usability, failure, trust, cost, gaps)
+# === PRIMARY: Playwright MCP browsing ===
+# Step 1: Generate search URLs focused on customer discovery categories
+subreddits = suggest_subreddits("your_industry")
+reddit_urls = build_reddit_search_urls(
+    keywords=["keyword1", "keyword2"],
+    subreddits=subreddits[:3],
+    categories=["cost", "gaps"],  # Best for WTP and demand signals
+    time_filter="year"
+)
+# Step 2: Use Playwright tools to browse each URL:
+#   browser_navigate(url=...) → browser_snapshot() → find threads
+#   browser_navigate(url=thread_url) → browser_snapshot() → extract WHO is posting
+# Focus on: job titles, company size context, dollar amounts mentioned, workarounds
+# See reddit-browser-protocol.md for detailed step-by-step instructions
+
+# === FALLBACK: Google dork search (if Playwright unavailable) ===
 reddit = mine_reddit_pain_points(["keyword1", "keyword2"])
-# WebFetch top threads to identify WHO is complaining (job titles, company sizes, context)
 # The "cost" category threads are especially useful for willingness-to-pay signals
 # The "gaps" category surfaces "wish there was" / "someone should build" — direct demand
 

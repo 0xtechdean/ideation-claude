@@ -344,6 +344,157 @@ def mine_reddit_pain_points(
 
 
 ###############################################################################
+# Reddit Browser Helpers — Generate URLs and queries for Playwright MCP browsing
+# Agents use Playwright tools (browser_navigate, browser_snapshot) to browse
+# old.reddit.com directly, bypassing Google dork + WebFetch limitations.
+###############################################################################
+
+# Subreddit mappings by industry/domain
+SUBREDDIT_MAP: Dict[str, List[str]] = {
+    "legal": ["law", "LawFirm", "legaltech", "Lawyertalk", "LawSchool"],
+    "healthcare": ["healthIT", "medicine", "nursing", "healthcare", "digitalhealth"],
+    "fintech": ["fintech", "banking", "personalfinance", "CreditCards", "FinancialPlanning"],
+    "saas": ["SaaS", "startups", "EntrepreneurRideAlong", "microsaas", "indiehackers"],
+    "devtools": ["programming", "webdev", "devops", "softwaredevelopment", "coding"],
+    "ai": ["artificial", "MachineLearning", "LocalLLaMA", "ChatGPT", "OpenAI"],
+    "ecommerce": ["ecommerce", "shopify", "FulfillmentByAmazon", "Entrepreneur", "smallbusiness"],
+    "education": ["edtech", "teaching", "education", "Teachers", "OnlineEducation"],
+    "cybersecurity": ["cybersecurity", "netsec", "AskNetsec", "InfoSecNews", "hacking"],
+    "hr": ["humanresources", "recruiting", "jobs", "careerguidance", "AskHR"],
+    "marketing": ["marketing", "digital_marketing", "SEO", "socialmedia", "PPC"],
+    "realestate": ["realestate", "RealEstateTechnology", "CommercialRealEstate", "PropertyManagement"],
+    "construction": ["Construction", "Contractors", "ProjectManagement"],
+    "accounting": ["Accounting", "tax", "Bookkeeping", "taxpros"],
+    "insurance": ["Insurance", "InsuranceProfessional", "HealthInsurance"],
+}
+
+
+def suggest_subreddits(industry: str, problem_keywords: List[str] = None) -> List[str]:
+    """
+    Map an industry domain to relevant subreddits for targeted Reddit browsing.
+
+    Args:
+        industry: Industry or domain (e.g., "legal", "saas", "healthcare")
+        problem_keywords: Optional additional keywords to find niche subreddits
+
+    Returns:
+        List of subreddit names (without r/ prefix) relevant to the industry
+    """
+    industry_lower = industry.lower()
+    subreddits = []
+
+    # Direct match
+    if industry_lower in SUBREDDIT_MAP:
+        subreddits.extend(SUBREDDIT_MAP[industry_lower])
+
+    # Partial match — check if industry keyword appears in any map key
+    for key, subs in SUBREDDIT_MAP.items():
+        if key in industry_lower or industry_lower in key:
+            for sub in subs:
+                if sub not in subreddits:
+                    subreddits.append(sub)
+
+    # Always include general startup/business subreddits for B2B problems
+    general_subs = ["startups", "Entrepreneur", "smallbusiness"]
+    for sub in general_subs:
+        if sub not in subreddits:
+            subreddits.append(sub)
+
+    return subreddits[:10]  # Cap at 10 to keep browsing manageable
+
+
+def build_reddit_search_query(keywords: List[str], pain_category: Optional[str] = None) -> str:
+    """
+    Build a Reddit-native search query string optimized for Reddit's internal
+    search engine (not Google dork). Uses quoted phrases and OR operators.
+
+    Args:
+        keywords: Topic keywords (e.g., ["legal research", "small law firms"])
+        pain_category: Optional pain category to target. One of:
+            "usability", "failure", "trust", "cost", "gaps".
+            If None, builds a broad query.
+
+    Returns:
+        Query string for Reddit's internal search (used in URL param q=)
+    """
+    # Topic part — OR together quoted phrases
+    topic_parts = [f'"{kw}"' for kw in keywords[:3]]
+    topic = " OR ".join(topic_parts)
+
+    if pain_category and pain_category in PAIN_CATEGORIES:
+        # Pick top 3 pain words for the category (Reddit search is less powerful than Google)
+        pain_words = PAIN_CATEGORIES[pain_category][:3]
+        pain_part = " OR ".join(f'"{pw}"' for pw in pain_words)
+        return f"({topic}) ({pain_part})"
+
+    return topic
+
+
+def build_reddit_search_urls(
+    keywords: List[str],
+    subreddits: Optional[List[str]] = None,
+    categories: Optional[List[str]] = None,
+    time_filter: str = "year",
+) -> List[Dict[str, str]]:
+    """
+    Generate old.reddit.com search URLs for each pain category, ready for
+    Playwright browser_navigate. Uses old.reddit.com because it's server-rendered
+    HTML that works reliably with browser_snapshot.
+
+    Args:
+        keywords: Topic keywords (e.g., ["legal research", "small law firms"])
+        subreddits: Optional specific subreddits to search within.
+            If provided, generates subreddit-restricted searches.
+        categories: Pain categories to generate URLs for.
+            Defaults to all: ["usability", "failure", "trust", "cost", "gaps"].
+        time_filter: Reddit time filter. One of: "hour", "day", "week",
+            "month", "year", "all". Default "year".
+
+    Returns:
+        List of dicts with keys: url, category, query, subreddit (if restricted)
+    """
+    if categories is None:
+        categories = list(PAIN_CATEGORIES.keys())
+
+    urls = []
+
+    for category in categories:
+        if category not in PAIN_CATEGORIES:
+            continue
+
+        query = build_reddit_search_query(keywords, category)
+        encoded_query = requests.utils.quote(query)
+
+        if subreddits:
+            # Subreddit-restricted searches
+            for sub in subreddits[:5]:
+                url = (
+                    f"https://old.reddit.com/r/{sub}/search"
+                    f"?q={encoded_query}&restrict_sr=on&sort=relevance&t={time_filter}"
+                )
+                urls.append({
+                    "url": url,
+                    "category": category,
+                    "query": query,
+                    "subreddit": sub,
+                })
+        else:
+            # Global Reddit search
+            url = (
+                f"https://old.reddit.com/search"
+                f"?q={encoded_query}&sort=relevance&t={time_filter}"
+            )
+            urls.append({
+                "url": url,
+                "category": category,
+                "query": query,
+                "subreddit": None,
+            })
+
+    return urls
+
+
+###############################################################################
 # Review Mining — Surface ideas from 2-3 star reviews on G2, Capterra, etc.
 # 2-3 star reviewers are committed users hitting real, recurring limitations.
 # Their complaints are specific, actionable, and shared by silent users.

@@ -14,15 +14,20 @@ Located in `scripts/`:
 - `requests` - HTTP requests for Slack/Serper APIs
 - `re` - Regex for markdown-to-Slack conversion
 
+### MCP Servers
+Configured in `.mcp.json`:
+- `playwright` (`@playwright/mcp@latest`) - Browser automation for Reddit browsing via `old.reddit.com`. Provides `browser_navigate`, `browser_snapshot`, `browser_click`, `browser_scroll_down`, etc. Used by market-researcher, customer-solution, and report-pivot agents to extract real Reddit posts/comments with `u/` usernames and upvote counts. Replaces the previous Google dork + WebFetch approach which couldn't access actual Reddit content.
+
 ## Claude Code Configuration
 
 ### Agents
 Located in `.claude/agents/`:
-- `market-researcher.md` - Market analysis agent
-- `customer-solution.md` - Customer discovery agent
+- `market-researcher.md` - Market analysis agent (uses Playwright MCP for Reddit)
+- `customer-solution.md` - Customer discovery agent (uses Playwright MCP for Reddit)
 - `feasibility-scorer.md` - Solution validation agent
-- `report-pivot.md` - Report generation agent
+- `report-pivot.md` - Report generation agent (uses Playwright MCP for gap-filling)
 - `deep-research-analyst.md` - High-quality research with confidence scoring
+- `reddit-browser-protocol.md` - Reusable Playwright instructions for Reddit browsing (reference doc, not standalone agent)
 
 ### Skills (Slash Commands)
 Located in `.claude/commands/`:
@@ -34,6 +39,7 @@ Located in `.claude/commands/`:
 
 ### Settings
 - `.claude/settings.json` - Project permissions (acceptEdits, allowed commands)
+- `.mcp.json` - MCP server configuration (Playwright browser automation)
 - `.claude/rules/` - Claude rules (this directory)
 
 ## Environment Variables

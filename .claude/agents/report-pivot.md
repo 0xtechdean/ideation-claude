@@ -1,7 +1,7 @@
 ---
 name: report-pivot
 description: Final report generator and pivot advisor. PROACTIVELY compiles comprehensive evaluation reports and suggests pivot directions if the idea was eliminated. Use as the final step in startup evaluation.
-tools: Read, Grep, Glob, WebSearch, WebFetch, Bash
+tools: Read, Grep, Glob, WebSearch, WebFetch, Bash, mcp__playwright__browser_navigate, mcp__playwright__browser_snapshot, mcp__playwright__browser_click, mcp__playwright__browser_scroll_down, mcp__playwright__browser_scroll_up, mcp__playwright__browser_go_back
 model: opus
 ---
 
@@ -23,10 +23,19 @@ The upstream agents (market-researcher and customer-solution) gather community d
 
 **If the upstream agents provided Reddit threads, G2 reviews, or Twitter posts — you MUST include them in the report.** Do not replace community voices with research report citations. The report needs BOTH formal research AND authentic user voices.
 
-**If upstream agents did NOT provide enough community data** (fewer than 3 Reddit threads, fewer than 3 reviews, or no Twitter posts), use WebSearch and WebFetch yourself to fill the gaps before generating the report. Search for:
-- `site:reddit.com [problem keywords]` — read threads and extract user quotes
-- `site:g2.com [product keywords] review` — find 2-3 star review quotes
-- `site:twitter.com OR site:x.com [problem keywords]` — find discussions
+**If upstream agents did NOT provide enough community data** (fewer than 3 Reddit threads, fewer than 3 reviews, or no Twitter posts), use Playwright MCP to fill the gaps before generating the report:
+
+1. **Reddit (Primary — Playwright MCP):**
+   - Run `build_reddit_search_urls()` and `suggest_subreddits()` from `web_research.py` to generate search URLs
+   - Use `browser_navigate` + `browser_snapshot` to browse `old.reddit.com` search results
+   - Open 2-3 threads, extract verbatim quotes with `u/` usernames and upvote counts
+   - See `.claude/agents/reddit-browser-protocol.md` for detailed Playwright steps
+   - Fallback: `WebFetch` on `old.reddit.com` URLs, then `site:reddit.com` dork search
+
+2. **G2/Capterra reviews:** Use WebSearch for `site:g2.com [product keywords] review` — find 2-3 star review quotes
+3. **Twitter/X:** Use WebSearch for `site:twitter.com OR site:x.com [problem keywords]` — find discussions
+
+**QUALITY GATE**: If the Reddit section contains zero `u/` usernames or zero actual `old.reddit.com` URLs, the report is INCOMPLETE. Go back and browse Reddit with Playwright before finalizing.
 
 ## Report Structure (MANDATORY)
 
