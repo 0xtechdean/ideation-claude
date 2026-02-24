@@ -78,7 +78,7 @@ def initialize_session(session_id: str, problem: str, threshold: float = 6.0, ap
     Args:
         session_id: Unique session identifier
         problem: Problem statement to evaluate
-        threshold: Score threshold for passing (default 5.0)
+        threshold: Score threshold for passing (default 6.0)
         api_key: Optional Mem0 API key
 
     Returns:
