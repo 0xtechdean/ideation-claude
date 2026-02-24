@@ -96,9 +96,9 @@ Slack notification not sent due to missing `SLACK_BOT_TOKEN` and `SLACK_CHANNEL_
 
 **Issues identified and fixed in QA review (2026-02-24):**
 
-1. `.gitignore` had `node_modules/` exclusion accidentally removed, causing 31,468 dependency files (~220MB) to be committed to the repository. **Fixed: `node_modules/` restored to `.gitignore`.**
-2. `.ai-task-plan-oSmRoVPx` marker file was committed with "In Progress" status despite task being complete. **Fixed: file removed.**
-3. `package.json` was added with `mem0ai` as a Node.js dependency, but this project uses the Python `mem0ai` package (via `requirements.txt`). The Node.js `mem0ai` package is unused by the agent pipeline. **Recommendation: remove `package.json` and `package-lock.json` if the JS mem0ai SDK is not needed.**
+1. `node_modules/` directory (31,468 files, 312MB) was committed despite `.gitignore` already excluding it. Root cause: the auto-commit system force-staged files before `.gitignore` filtering applied. **Fixed by QA pass: `node_modules/` deleted from working tree and removed from tracking.**
+2. `package.json` was added with `mem0ai` as a Node.js dependency, but this project uses the Python `mem0ai` package (via `requirements.txt`). The Node.js package is unused. **Fixed by QA pass: `package.json` and `package-lock.json` removed.**
+3. `.ai-task-plan-oSmRoVPx` marker file was left with "In Progress" status despite task being complete. **Fixed by QA pass: file removed.**
 4. `scripts/post_message()` in `slack_helpers.py` had no exception handling for network failures — a `requests.RequestException` would propagate uncaught. **Fixed: wrapped in try/except, added 30s timeout.**
 5. `scripts/send_full_report()` opened the report file without a try/except — a missing file would crash the process. **Fixed: added FileNotFoundError and OSError handling.**
 6. `.env` loading in `slack_helpers.py` did not strip quotes from values (unlike `web_research.py` and `mem0_helpers.py`) — `SLACK_BOT_TOKEN="xoxb-..."` would include literal quotes. **Fixed: added `.strip('"').strip("'")`.**
