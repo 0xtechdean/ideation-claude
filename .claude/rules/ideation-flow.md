@@ -4,7 +4,8 @@
 
 1. **Always use Opus 4.5** (`model: opus`) for all agents and tasks
 2. **Use ralph-wiggum** for autonomous execution: `/ralph-loop "Validate: {problem}" --max-iterations 30`
-3. **Never stop mid-flow** - complete all 5 phases before presenting results
+3. **Never stop mid-flow** - complete all phases before presenting results
+4. **Detect integrations early** - Check for `MEM0_API_KEY`, `SLACK_BOT_TOKEN`, `SLACK_CHANNEL_ID` at session init. Pass `Mem0 persistence: enabled/disabled` flag in Task prompts to agents.
 
 ## Research Source Requirements
 
@@ -35,13 +36,13 @@
 
 ## Phase Execution Order
 
-1. **Initialize**: Generate session_id, write to Mem0
+1. **Initialize**: Generate session_id, write to Mem0 (if `MEM0_API_KEY` configured)
 2. **Phase 1**: Launch market-researcher + customer-solution IN PARALLEL
 3. **Decision**: If problem_score < 6.0 → ELIMINATE → Skip to Phase 3
 4. **Phase 2**: Launch feasibility-scorer (only if problem passes)
 5. **Phase 3**: Launch report-pivot
 6. **Phase 4**: Save report to `reports/{name}-{session_id}.md`
-7. **Phase 5**: Send summary + full report to Slack
+7. **Phase 5**: Send summary + full report to Slack (if `SLACK_BOT_TOKEN` configured)
 
 ## Scoring Rules
 
@@ -60,6 +61,8 @@ Use the Task tool with these agent types:
 
 ## Slack Notifications
 
-Always send BOTH:
+If `SLACK_BOT_TOKEN` and `SLACK_CHANNEL_ID` are set, send BOTH:
 1. Block Kit summary via `send_evaluation_report()`
 2. Full report via `send_full_report()` (converts markdown to Slack mrkdwn)
+
+If Slack is not configured, skip Phase 5. Report is saved to disk in Phase 4.

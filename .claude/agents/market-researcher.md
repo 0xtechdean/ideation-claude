@@ -211,9 +211,9 @@ Your output MUST include:
 | [Source 3] | Government/NGO | [Regulation/standard] |
 ```
 
-## Writing to Mem0 (if session_id provided)
+## Writing to Mem0 (if enabled)
 
-If a session_id is provided in your prompt, write your findings to Mem0:
+If your prompt indicates **"Mem0 persistence: enabled"** AND a session_id is provided, write your findings to Mem0. If Mem0 is disabled, skip this section — the orchestrator reads your output directly from the Task result.
 
 ```python
 from mem0 import MemoryClient

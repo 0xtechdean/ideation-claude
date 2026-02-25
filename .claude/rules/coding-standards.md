@@ -22,14 +22,14 @@ except requests.RequestException as e:
 
 ### Environment Variables
 ```python
-# Good: Use fallback loading
-def load_credentials():
-    token = os.environ.get("SLACK_BOT_TOKEN")
-    if not token:
+# Good: Use fallback loading with optional support
+def load_credentials(var_name):
+    value = os.environ.get(var_name)
+    if not value:
         # Try loading from .env file
         env_path = Path(__file__).parent.parent / ".env"
         # ... load from file
-    return token
+    return value  # Returns None if not configured
 ```
 
 ## Agent Definitions
@@ -50,8 +50,9 @@ model: opus
 2. Second task
 
 ## Output Format
-- Always write to Mem0
-- Include scores and sources
+- Write to Mem0 if enabled in prompt (check for "Mem0 persistence: enabled")
+- Always include scores in structured markdown output
+- Scores must be in parseable format: `| **Score** | **X/10** |`
 ```
 
 ### Naming
