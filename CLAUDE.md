@@ -128,20 +128,26 @@ Located in `.claude/agents/`:
 Generate a unique session ID and detect available integrations:
 
 ```python
-import os
+import json
 import random
 import string
+import subprocess
 
 session_id = ''.join(random.choices(string.ascii_lowercase + string.digits, k=8))
 
-# Detect available integrations
-use_mem0 = bool(os.environ.get("MEM0_API_KEY"))
-use_slack = bool(os.environ.get("SLACK_BOT_TOKEN")) and bool(os.environ.get("SLACK_CHANNEL_ID"))
+# Detect available integrations — reads from shell env AND .env file
+result = subprocess.run(
+    ["python3", "scripts/detect_integrations.py"],
+    capture_output=True, text=True
+)
+integrations = json.loads(result.stdout)
+use_mem0 = integrations["use_mem0"]
+use_slack = integrations["use_slack"]
 
 # Initialize Mem0 (only if configured)
 if use_mem0:
     from mem0 import MemoryClient
-    client = MemoryClient(api_key=os.environ.get("MEM0_API_KEY"))
+    client = MemoryClient(api_key=integrations["MEM0_API_KEY"])
     client.add(
         f"Session initialized for problem: {problem}",
         user_id=f"ideation_orchestrator_{session_id}",

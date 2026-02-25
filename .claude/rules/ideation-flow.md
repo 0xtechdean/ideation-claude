@@ -5,7 +5,7 @@
 1. **Always use Opus 4.5** (`model: opus`) for all agents and tasks
 2. **Use ralph-wiggum** for autonomous execution: `/ralph-loop "Validate: {problem}" --max-iterations 30`
 3. **Never stop mid-flow** - complete all phases before presenting results
-4. **Detect integrations early** - Check for `MEM0_API_KEY`, `SLACK_BOT_TOKEN`, `SLACK_CHANNEL_ID` at session init. Pass `Mem0 persistence: enabled/disabled` flag in Task prompts to agents.
+4. **Detect integrations early** - Run `python3 scripts/detect_integrations.py` at session init (reads from shell env AND `.env` file). Parse JSON output for `use_mem0` and `use_slack`. Pass `Mem0 persistence: enabled/disabled` flag in Task prompts to agents.
 
 ## Research Source Requirements
 
