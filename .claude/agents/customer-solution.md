@@ -34,9 +34,24 @@ Think from first principles. Decompose customer segments and pain points to thei
 ## How to Execute
 
 1. **Read market research first** if available (from market-researcher agent)
-2. **Use WebSearch** to find customer data, forums, reviews
-3. **Be specific** about customer characteristics and budgets
-4. **Prioritize ruthlessly** - MVP means minimum!
+2. **Search Reddit** using `search_reddit_struggles()` for real user pain points — then **WebFetch the top threads** to understand who these people are (job titles, company sizes, context)
+3. **Use WebSearch** to find customer data, forums, reviews
+4. **Be specific** about customer characteristics and budgets
+5. **Prioritize ruthlessly** - MVP means minimum!
+
+### Reddit Customer Discovery
+```python
+import sys, os
+repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(repo_root, 'scripts'))
+from web_research import mine_reddit_pain_points
+
+# Mine Reddit across all 5 pain categories (usability, failure, trust, cost, gaps)
+reddit = mine_reddit_pain_points(["keyword1", "keyword2"])
+# WebFetch top threads to identify WHO is complaining (job titles, company sizes, context)
+# The "cost" category threads are especially useful for willingness-to-pay signals
+# The "gaps" category surfaces "wish there was" / "someone should build" — direct demand
+```
 
 ## Output Format
 
