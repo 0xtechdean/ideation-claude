@@ -4,7 +4,8 @@
 
 1. **Always use Opus** (`model: opus`) for all agents and tasks
 2. **Use ralph-wiggum** for autonomous execution: `/ralph-loop "Validate: {problem}" --max-iterations 30`
-3. **Never stop mid-flow** - complete all 5 phases before presenting results
+3. **Never stop mid-flow** - complete all phases before presenting results
+4. **Detect integrations early** - Run `python3 scripts/detect_integrations.py` at session init (reads from shell env AND `.env` file). Parse JSON output for `use_mem0` and `use_slack`. Pass `Mem0 persistence: enabled/disabled` flag in Task prompts to agents.
 
 ## v2.0 Changes Summary
 
@@ -46,7 +47,7 @@ The scoring model was overhauled after analyzing 130 reports. Key changes:
 
 ## Phase Execution Order
 
-1. **Initialize**: Generate session_id, write to Mem0
+1. **Initialize**: Generate session_id, write to Mem0 (if `MEM0_API_KEY` configured)
 2. **Phase 1**: Launch market-researcher + customer-solution IN PARALLEL
 3. **Decision**:
    - If market_timing < 4 → EARLY ELIMINATION
@@ -57,7 +58,7 @@ The scoring model was overhauled after analyzing 130 reports. Key changes:
    - Smart mediocrity check if combined 6.0-6.5
 5. **Phase 3**: Launch report-pivot
 6. **Phase 4**: Save report to `reports/{name}-{session_id}.md`
-7. **Phase 5**: Send summary + full report to Slack
+7. **Phase 5**: Send summary + full report to Slack (if `SLACK_BOT_TOKEN` configured)
 
 ## Scoring Rules (v2.0)
 
@@ -107,6 +108,8 @@ Use the Agent tool with these agent types:
 
 ## Slack Notifications
 
-Always send BOTH:
+If `SLACK_BOT_TOKEN` and `SLACK_CHANNEL_ID` are set, send BOTH:
 1. Block Kit summary via `send_evaluation_report()`
 2. Full report via `send_full_report()` (converts markdown to Slack mrkdwn)
+
+If Slack is not configured, skip Phase 5. Report is saved to disk in Phase 4.

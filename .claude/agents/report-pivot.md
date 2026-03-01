@@ -345,7 +345,9 @@ Since the evaluation score was below threshold, here are recommended pivot direc
 - Press releases
 - Sponsored content
 
-## Writing to Mem0
+## Writing to Mem0 (if enabled)
+
+If your prompt indicates **"Mem0 persistence: enabled"** AND a session_id is provided, write your findings to Mem0. If Mem0 is disabled, skip this section — the report is saved to disk by the orchestrator.
 
 ```python
 from mem0 import MemoryClient

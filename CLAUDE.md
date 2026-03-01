@@ -48,7 +48,7 @@ Orchestrator (you)
 └─────────────────────────────────────────────┘
     ↓
 ┌─────────────────────────────────────────────┐
-│  PHASE 5: Notify                            │
+│  PHASE 5: Notify (if Slack configured)      │
 │  └── Send summary to Slack channel          │
 └─────────────────────────────────────────────┘
 ```
@@ -113,12 +113,12 @@ All sub-agents in `.claude/agents/` are configured with `model: opus`.
 ```
 
 This ensures the entire pipeline runs to completion without manual intervention between phases. The flow will:
-1. Initialize session and Mem0
+1. Initialize session (and Mem0 if configured)
 2. Run Phase 1 agents in parallel
 3. Calculate scores and make elimination decision
 4. Run Phase 2 if problem passes
 5. Generate report
-6. Save to file and send to Slack
+6. Save to file (and send to Slack if configured)
 7. Present summary to user
 
 To stop early if needed: `/cancel-ralph`
@@ -138,27 +138,40 @@ Located in `.claude/agents/`:
 
 ### Step 1: Initialize Session
 
-Generate a unique session ID and initialize Mem0:
+Generate a unique session ID and detect available integrations:
 
 ```python
+import json
 import random
 import string
-from mem0 import MemoryClient
+import subprocess
 
 session_id = ''.join(random.choices(string.ascii_lowercase + string.digits, k=8))
 
-client = MemoryClient(api_key=MEM0_API_KEY)
-client.add(
-    f"Session initialized for problem: {problem}",
-    user_id=f"ideation_orchestrator_{session_id}",
-    metadata={
-        "type": "session_init",
-        "session_id": session_id,
-        "problem": problem,
-        "threshold": 6.0,
-        "status": "started"
-    }
+# Detect available integrations — reads from shell env AND .env file
+result = subprocess.run(
+    ["python3", "scripts/detect_integrations.py"],
+    capture_output=True, text=True
 )
+integrations = json.loads(result.stdout)
+use_mem0 = integrations["use_mem0"]
+use_slack = integrations["use_slack"]
+
+# Initialize Mem0 (only if configured)
+if use_mem0:
+    from mem0 import MemoryClient
+    client = MemoryClient(api_key=integrations["MEM0_API_KEY"])
+    client.add(
+        f"Session initialized for problem: {problem}",
+        user_id=f"ideation_orchestrator_{session_id}",
+        metadata={
+            "type": "session_init",
+            "session_id": session_id,
+            "problem": problem,
+            "threshold": 6.0,
+            "status": "started"
+        }
+    )
 ```
 
 ### Phase 1: PROBLEM VALIDATION (Parallel)
@@ -168,12 +181,14 @@ Use the **Task tool** to launch both problem validation agents in PARALLEL:
 ```
 Task 1: market-researcher
 - Prompt: Analyze market for "{problem}" with session_id={session_id}
+- Mem0 persistence: {enabled if use_mem0 else disabled}
 - Research market trends and calculate TAM/SAM/SOM
 - Score: Market Size (1-10), Market Timing (1-10) ← NEW v2.0
 - Write findings + market timing score to Mem0
 
 Task 2: customer-solution
 - Prompt: Analyze customers for "{problem}" with session_id={session_id}
+- Mem0 persistence: {enabled if use_mem0 else disabled}
 - Identify customer segments, pain points, willingness to pay
 - Score: Solution Fit (1-10), WTP with evidence tier classification ← NEW v2.0
 - Classify WTP evidence as Tier 1/2/3 and cap score accordingly
@@ -214,6 +229,7 @@ else:
 ```
 Task 3: feasibility-scorer
 - Prompt: Evaluate solution feasibility for "{problem}" with session_id={session_id}
+- Mem0 persistence: {enabled if use_mem0 else disabled}
 - **Run kill switch gates FIRST** (competitor, regulatory, timing)
 - Analyze competition and market gaps
 - Assess technical feasibility and resource requirements
@@ -256,9 +272,9 @@ Always run report-pivot (it includes pivot suggestions if eliminated):
 ```
 Task 4: report-pivot
 - Prompt: Generate report for "{problem}" with session_id={session_id}
+- Mem0 persistence: {enabled if use_mem0 else disabled}
 - Compile all phase outputs
 - If verdict="FAIL": Include 3-5 pivot suggestions
-- Write final report to Mem0
 ```
 
 ### Phase 4: Save Report to File
@@ -282,9 +298,11 @@ The report should include all sections:
 
 Use the **Write tool** to save the report file.
 
-### Phase 5: Send FULL Report to Slack
+### Phase 5: Send Report to Slack (if configured)
 
-After saving the report, **ALWAYS send both a summary AND the full report to Slack**.
+**Only run if `use_slack` is true** (both `SLACK_BOT_TOKEN` and `SLACK_CHANNEL_ID` are set).
+
+If Slack is not configured, skip this phase entirely. The report is already saved to disk in Phase 4.
 
 **IMPORTANT**: Slack uses `mrkdwn` format, NOT standard Markdown. Always convert before sending!
 
@@ -344,37 +362,40 @@ The helper script loads credentials automatically from:
 ## Complete Orchestration Checklist (v2.0)
 
 1. [ ] Generate session_id (8 random chars)
-2. [ ] Initialize session in Mem0
+2. [ ] Detect integrations (`use_mem0`, `use_slack`)
+3. [ ] Initialize session in Mem0 (if configured)
 
 **Phase 1: PROBLEM VALIDATION (PARALLEL)**
-3. [ ] Launch Task: market-researcher (parallel) — includes Market Timing score
-4. [ ] Launch Task: customer-solution (parallel) — includes WTP evidence tier
-5. [ ] Wait for both to complete
-6. [ ] Cap WTP score based on evidence tier (Tier 3 max = 4)
-7. [ ] Calculate problem_score from 5 criteria (pain, addressability, market, WTP, timing)
+4. [ ] Launch Task: market-researcher (parallel, with Mem0 flag) — includes Market Timing score
+5. [ ] Launch Task: customer-solution (parallel, with Mem0 flag) — includes WTP evidence tier
+6. [ ] Wait for both to complete
+7. [ ] Cap WTP score based on evidence tier (Tier 3 max = 4)
+8. [ ] Calculate problem_score from 5 criteria (pain, addressability, market, WTP, timing)
 
 **DECISION POINT (v2.0 — multiple elimination paths)**
-8. [ ] If market_timing < 4 → EARLY ELIMINATION → Skip to step 12
-9. [ ] If problem_score < 6.0 → ELIMINATE → Skip to step 12
-10. [ ] If problem_score >= 6.0 → Continue to Phase 2
+9. [ ] If market_timing < 4 → EARLY ELIMINATION → Skip to step 12
+10. [ ] If problem_score < 6.0 → ELIMINATE → Skip to step 12
+11. [ ] If problem_score >= 6.0 → Continue to Phase 2
 
 **Phase 2: SOLUTION VALIDATION (Only if problem passes!)**
-11. [ ] Launch Task: feasibility-scorer (runs kill switch gates FIRST)
-12. [ ] Check: Kill switches triggered? → AUTO-FAIL
-13. [ ] Check: Competitive Advantage ≤ 3? → AUTO-FAIL
-14. [ ] Calculate combined_score = (problem × 55%) + (solution × 45%)
-15. [ ] If combined 6.0-6.5: Run smart mediocrity check
+12. [ ] Launch Task: feasibility-scorer (runs kill switch gates FIRST, with Mem0 flag)
+13. [ ] Check: Kill switches triggered? → AUTO-FAIL
+14. [ ] Check: Competitive Advantage ≤ 3? → AUTO-FAIL
+15. [ ] Calculate combined_score = (problem × 55%) + (solution × 45%)
+16. [ ] If combined 6.0-6.5: Run smart mediocrity check
 
 **Phase 3: Report**
-16. [ ] Launch Task: report-pivot (includes kill switch results, pivot suggestions if failed)
+17. [ ] Launch Task: report-pivot (includes kill switch results, with Mem0 flag, pivot suggestions if failed)
 
 **Phase 4: Save Report**
-17. [ ] Save full report to `reports/{name}-{session_id}.md`
+18. [ ] Save full report to `reports/{name}-{session_id}.md`
 
-**Phase 5: Send to Slack (ALWAYS DO THIS)**
-18. [ ] Send formatted summary to Slack (Block Kit)
-19. [ ] Send full report to Slack (converted to mrkdwn format)
-20. [ ] Present summary and file location to user
+**Phase 5: Notify (if Slack configured)**
+19. [ ] Send formatted summary to Slack (Block Kit)
+20. [ ] Send full report to Slack (converted to mrkdwn format)
+
+**Present Results**
+21. [ ] Present summary and file location to user
 
 **Expected Time**:
 - Full flow (problem passes): ~10-12 minutes
@@ -423,6 +444,8 @@ If combined score is in the marginal zone, count red flags:
 
 ## Mem0 User ID Scheme
 
+*This section only applies when `MEM0_API_KEY` is configured. Without Mem0, agents return output directly to the orchestrator via Task tool results.*
+
 | Agent | MEM0_USER_ID Pattern |
 |-------|---------------------|
 | Orchestrator | `ideation_orchestrator_{session_id}` |
@@ -435,10 +458,32 @@ If combined score is in the marginal zone, count red flags:
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `MEM0_API_KEY` | Yes | For Mem0 cloud storage |
-| `SLACK_BOT_TOKEN` | Yes | Slack Bot Token (xoxb-...) for sending reports |
-| `SLACK_CHANNEL_ID` | Yes | Channel ID to post reports to |
-| `SERPER_API_KEY` | Optional | For web search (Serper API) |
+| `SERPER_API_KEY` | Recommended | For web search (Serper API) |
+| `MEM0_API_KEY` | Optional | For Mem0 session persistence |
+| `SLACK_BOT_TOKEN` | Optional | Slack Bot Token (xoxb-...) for sending reports |
+| `SLACK_CHANNEL_ID` | Optional | Channel ID to post reports to |
+
+## Running Without External Integrations
+
+The pipeline works fully without Mem0 or Slack:
+
+### Without Mem0 (`MEM0_API_KEY` not set)
+- Agents skip Mem0 writes
+- Orchestrator extracts scores from Task tool text output (structured markdown tables)
+- `/report {session_id}` only works from saved report files (no Mem0 regeneration)
+- No session persistence across separate Claude Code sessions
+
+### Without Slack (`SLACK_BOT_TOKEN` not set)
+- Phase 5 is skipped entirely
+- Reports are saved to `reports/` directory only
+- Use `/report {session_id}` to view saved reports
+
+### Minimum Configuration
+| Variable | Required | Purpose |
+|----------|----------|---------|
+| `SERPER_API_KEY` | Recommended | Web search for research quality |
+
+All other variables are optional enhancements.
 
 ## Performance Comparison
 
@@ -455,9 +500,9 @@ If combined score is in the marginal zone, count red flags:
 The `scripts/` directory contains reusable Python helpers:
 
 - `web_research.py` - Web search functions using Serper API
-- `mem0_helpers.py` - Streamlined Mem0 operations
+- `mem0_helpers.py` - Streamlined Mem0 operations (used when `MEM0_API_KEY` is set)
 - `analysis_tools.py` - TAM/SAM/SOM calculation, scoring, competitive analysis
-- `slack_helpers.py` - Slack integration with:
+- `slack_helpers.py` - Slack integration (used when `SLACK_BOT_TOKEN` is set):
   - `markdown_to_slack()` - Convert GitHub markdown to Slack mrkdwn
   - `send_full_report()` - Send full report (auto-converts and chunks)
   - `send_evaluation_report()` - Send Block Kit summary
@@ -474,32 +519,35 @@ You should:
 
 1. **Generate session_id**: `abc12345`
 
-2. **Initialize Mem0**: Write session start
+2. **Detect integrations**: Check env vars, set `use_mem0` and `use_slack`
 
-3. **Phase 1: PROBLEM VALIDATION** (single message with 2 parallel Tasks):
-   - Task: market-researcher → "Analyze market for legal research problem..." (returns market_timing=7)
-   - Task: customer-solution → "Analyze customers for legal research problem..." (returns WTP tier=2, capped=6)
+3. **Initialize Mem0** (if configured): Write session start
+
+4. **Phase 1: PROBLEM VALIDATION** (single message with 2 parallel Tasks):
+   - Task: market-researcher → "Analyze market for legal research problem... Mem0 persistence: enabled/disabled" (returns market_timing=7)
+   - Task: customer-solution → "Analyze customers for legal research problem... Mem0 persistence: enabled/disabled" (returns WTP tier=2, capped=6)
    - Wait for both to complete
    - Calculate problem_score from 5 criteria = 7.2/10
 
 4. **DECISION**: market_timing (7) >= 4 ✓, problem_score (7.2) >= 6.0 ✓ → Continue to Phase 2
 
 5. **Phase 2: SOLUTION VALIDATION**:
-   - Task: feasibility-scorer → Runs kill switch gates first (all clear)
+   - Task: feasibility-scorer → Runs kill switch gates first (all clear)→ "Evaluate solution feasibility... Mem0 persistence: enabled/disabled"
    - Calculate solution_score = 7.0/10 (CA=7, no floor hit)
    - combined_score = (7.2 × 0.55) + (7.0 × 0.45) = 7.11/10
    - Verdict: PASS
 
-6. **Phase 3: REPORT**:
-   - Task: report-pivot → "Generate final report..."
+7. **Phase 3: REPORT**:
+   - Task: report-pivot → "Generate final report... Mem0 persistence: enabled/disabled"
 
-7. **Phase 4: SAVE**:
+8. **Phase 4: SAVE**:
    - Save full report to `reports/legal-research-evaluation-abc12345.md`
 
-8. **Phase 5: NOTIFY**:
+9. **Phase 5: NOTIFY** (if Slack configured):
    - Send Block Kit summary to Slack
    - Send full report to Slack (converted to mrkdwn, chunked)
-   - Present summary and file location to user
+
+10. **Present summary and file location to user**
 
 **Early Elimination Example** (if problem_score = 3.5):
 - Skip Phase 2 entirely

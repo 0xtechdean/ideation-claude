@@ -31,7 +31,7 @@ Think from first principles. Decompose customer segments and pain points to thei
 ### Part 3: Solution Fit Scoring (CRITICAL)
 - Evaluate how well proposed solution addresses pain points
 - Score Solution Fit (1-10) with justification
-- **Write score to Mem0 for orchestrator** - this score is required for problem validation
+- **Include Solution Fit Score in output** - this score is required for problem validation. Write to Mem0 if enabled.
 
 ## How to Execute
 
@@ -161,7 +161,9 @@ You MUST classify WTP evidence into one of three tiers. The tier CAPS the maximu
 
 ```
 
-## Writing to Mem0 (if session_id provided)
+## Writing to Mem0 (if enabled)
+
+If your prompt indicates **"Mem0 persistence: enabled"** AND a session_id is provided, write your findings to Mem0. If Mem0 is disabled, skip this section — the orchestrator reads your Solution Fit Score from the table above.
 
 ```python
 from mem0 import MemoryClient
@@ -207,7 +209,7 @@ Your analysis is complete when you have:
 - [ ] Defined ICP with specific criteria
 - [ ] Created Mom Test interview framework
 - [ ] Listed Go/No-Go signals
-- [ ] **Scored Solution Fit (1-10) and written to Mem0**
+- [ ] **Scored Solution Fit (1-10) in output (and written to Mem0 if enabled)**
 - [ ] **Classified WTP evidence into Tier 1/2/3 with justification**
 - [ ] **Capped WTP score based on tier (Tier 3 max = 4)**
 - [ ] **Written WTP tier and capped score to Mem0**

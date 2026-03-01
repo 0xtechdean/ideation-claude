@@ -346,7 +346,9 @@ Combined Score: X.X/10
 | [Risk 1] | High/Med/Low | High/Med/Low | [Strategy] |
 ```
 
-## Writing to Mem0 (if session_id provided)
+## Writing to Mem0 (if enabled)
+
+If your prompt indicates **"Mem0 persistence: enabled"** AND a session_id is provided, write your findings to Mem0. If Mem0 is disabled, skip this section — the orchestrator reads scores from your Scoring Evaluation tables directly.
 
 ```python
 from mem0 import MemoryClient

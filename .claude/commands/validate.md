@@ -14,12 +14,15 @@ Follow the complete orchestration flow from CLAUDE.md (v2.0 scoring model):
 
 1. **Initialize Session**
    - Generate a unique 8-character session_id
-   - Initialize Mem0 with session metadata
+   - Detect integrations: check `MEM0_API_KEY`, `SLACK_BOT_TOKEN`, `SLACK_CHANNEL_ID`
+   - If `MEM0_API_KEY` is set: initialize Mem0 with session metadata
+   - Set flags: `use_mem0` and `use_slack` for downstream agents
 
 2. **Phase 1: Problem Validation** (PARALLEL)
    - Launch `market-researcher` agent - Market trends, TAM/SAM/SOM, **Market Timing score (1-10)**
    - Launch `customer-solution` agent - Customer segments, MVP design, **WTP evidence tier (1/2/3)**
    - Cap WTP score based on evidence tier (Tier 3 max = 4)
+   - Include in each Task prompt: `Mem0 persistence: enabled/disabled`
    - Calculate problem_score from **5 criteria** (pain, addressability, market, WTP, timing)
 
 3. **Decision Point (v2.0 — multiple elimination paths)**
@@ -29,6 +32,7 @@ Follow the complete orchestration flow from CLAUDE.md (v2.0 scoring model):
 
 4. **Phase 2: Solution Validation** (only if problem passes)
    - Launch `feasibility-scorer` agent
+   - Include in Task prompt: `Mem0 persistence: enabled/disabled`
    - **Kill switch gates run FIRST** (competitor $20M+, regulatory, timing)
    - Any kill switch triggered → AUTO-FAIL
    - Competitive Advantage ≤ 3 → AUTO-FAIL
@@ -43,9 +47,11 @@ Follow the complete orchestration flow from CLAUDE.md (v2.0 scoring model):
 6. **Phase 4: Save Report**
    - Save to `reports/{sanitized-name}-{session_id}.md`
 
-7. **Phase 5: Notify**
-   - Send Block Kit summary to Slack
-   - Send full report to Slack (converted to mrkdwn)
+7. **Phase 5: Notify** (if Slack configured)
+   - If `SLACK_BOT_TOKEN` and `SLACK_CHANNEL_ID` are set:
+     - Send Block Kit summary to Slack
+     - Send full report to Slack (converted to mrkdwn)
+   - If not set: skip, report is saved to disk
 
 8. **Present Results**
    - Display summary table with scores, kill switch results, and verdict

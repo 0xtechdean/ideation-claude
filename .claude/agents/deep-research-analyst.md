@@ -195,9 +195,9 @@ Focus on:
 - Team expertise requirements
 - Vendor comparisons (if applicable)
 
-## Writing to Mem0 (if session_id provided)
+## Writing to Mem0 (if enabled)
 
-If a session_id is provided, write findings to Mem0:
+If your prompt indicates **"Mem0 persistence: enabled"** AND a session_id is provided, write findings to Mem0. If Mem0 is disabled, skip this section.
 
 ```python
 from mem0 import MemoryClient

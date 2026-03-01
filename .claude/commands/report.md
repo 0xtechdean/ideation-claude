@@ -16,11 +16,13 @@ Parse the arguments to determine the action:
 1. Look for existing report in `reports/` directory matching the session_id
 2. If found:
    - Display the report contents
-   - Offer options: "resend to Slack", "regenerate", "summarize"
+   - Offer options: "regenerate", "summarize"
+   - If `SLACK_BOT_TOKEN` is set: also offer "resend to Slack"
 3. If not found:
-   - Check Mem0 for session data with that ID
-   - If session exists in Mem0, offer to regenerate the report
-   - If no session found, inform user
+   - If `MEM0_API_KEY` is set: check Mem0 for session data with that ID
+     - If session exists in Mem0, offer to regenerate the report
+   - If `MEM0_API_KEY` is not set or no session found:
+     - Inform user: "No report found for session {id}. Reports are available from `reports/` directory."
 
 ### If "list" or "all" provided (e.g., `/report list`):
 1. List all reports in the `reports/` directory
@@ -33,7 +35,8 @@ Parse the arguments to determine the action:
 
 ### If "resend {session_id}" provided:
 1. Find the report file
-2. Resend to Slack using `send_full_report()`
+2. If `SLACK_BOT_TOKEN` is set: resend to Slack using `send_full_report()`
+3. If not set: inform user "Slack is not configured. Set SLACK_BOT_TOKEN and SLACK_CHANNEL_ID to enable."
 
 ## Output Format
 

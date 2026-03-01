@@ -5,12 +5,12 @@
 ### Python Scripts
 Located in `scripts/`:
 - `web_research.py` - Web search via Serper API
-- `mem0_helpers.py` - Mem0 session management
+- `mem0_helpers.py` - Mem0 session management (optional)
 - `analysis_tools.py` - TAM/SAM/SOM calculations
-- `slack_helpers.py` - Slack notifications and formatting
+- `slack_helpers.py` - Slack notifications and formatting (optional)
 
 ### Key Libraries
-- `mem0` - Session state management across agents
+- `mem0` - Session persistence (optional - pipeline works without it)
 - `requests` - HTTP requests for Slack/Serper APIs
 - `re` - Regex for markdown-to-Slack conversion
 
@@ -40,12 +40,12 @@ Located in `.claude/commands/`:
 
 | Variable | Required | Purpose |
 |----------|----------|---------|
-| `MEM0_API_KEY` | Yes | Mem0 cloud storage |
-| `SERPER_API_KEY` | Yes | Web search |
-| `SLACK_BOT_TOKEN` | Yes | Slack notifications |
-| `SLACK_CHANNEL_ID` | Yes | Slack channel |
+| `SERPER_API_KEY` | Recommended | Web search |
+| `MEM0_API_KEY` | Optional | Session persistence via Mem0 |
+| `SLACK_BOT_TOKEN` | Optional | Slack notifications |
+| `SLACK_CHANNEL_ID` | Optional | Slack channel |
 
 ## Output
 
-- Reports saved to `reports/{name}-{session_id}.md`
-- Slack notifications sent via Block Kit + full report
+- Reports always saved to `reports/{name}-{session_id}.md`
+- Slack notifications sent via Block Kit + full report (if Slack configured)
