@@ -1,6 +1,5 @@
 {
   "permissions": {
-    "defaultMode": "acceptEdits",
     "allow": [
       "Bash(python3:*)",
       "Bash(git add:*)",
@@ -28,7 +27,10 @@
       "Bash(mv:*)",
       "Bash(rm:*)",
       "Bash(curl:*)",
-      "WebSearch"
-    ]
+      "WebSearch",
+      "WebFetch(domain:finance.yahoo.com)"
+    ],
+    "defaultMode": "acceptEdits",
+    "alwaysThinkingEnabled": true
   }
 }
