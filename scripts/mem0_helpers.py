@@ -71,14 +71,14 @@ def get_user_id(agent_name: str, session_id: str) -> str:
     return f"ideation_{agent_name}_{session_id}"
 
 
-def initialize_session(session_id: str, problem: str, threshold: float = 5.0, api_key: str = None) -> bool:
+def initialize_session(session_id: str, problem: str, threshold: float = 6.0, api_key: str = None) -> bool:
     """
     Initialize a new evaluation session.
 
     Args:
         session_id: Unique session identifier
         problem: Problem statement to evaluate
-        threshold: Score threshold for passing (default 5.0)
+        threshold: Score threshold for passing (default 6.0)
         api_key: Optional Mem0 API key
 
     Returns:
