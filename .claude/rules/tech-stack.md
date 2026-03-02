@@ -5,6 +5,7 @@
 ### Python Scripts
 Located in `scripts/`:
 - `web_research.py` - Web search via Serper API
+- `discovery_sources.py` - 5-source discovery pipeline (Arctic Shift, PullPush, HN Algolia, Federal Register, Serper Reddit dorks)
 - `mem0_helpers.py` - Mem0 session management (optional)
 - `analysis_tools.py` - TAM/SAM/SOM calculations
 - `slack_helpers.py` - Slack notifications and formatting (optional)
@@ -18,6 +19,7 @@ Located in `scripts/`:
 
 ### Agents
 Located in `.claude/agents/`:
+- `discovery-engine.md` - Problem discovery from 5 data sources (Phase 0)
 - `market-researcher.md` - Market analysis agent
 - `customer-solution.md` - Customer discovery agent
 - `feasibility-scorer.md` - Solution validation agent
@@ -26,6 +28,7 @@ Located in `.claude/agents/`:
 
 ### Skills (Slash Commands)
 Located in `.claude/commands/`:
+- `/discover <vertical>` - Mine 5 sources for pain signals, discover problems (Phase 0)
 - `/validate <problem>` - Full ideation pipeline
 - `/quick-check <problem>` - Lightweight validation (market + customer only)
 - `/compare <problem1> vs <problem2>` - Side-by-side comparison
@@ -47,5 +50,6 @@ Located in `.claude/commands/`:
 
 ## Output
 
-- Reports always saved to `reports/{name}-{session_id}.md`
+- Discovery reports saved to `discoveries/{vertical}-{session_id}.md`
+- Validation reports saved to `reports/{name}-{session_id}.md`
 - Slack notifications sent via Block Kit + full report (if Slack configured)

@@ -47,6 +47,7 @@ The scoring model was overhauled after analyzing 130 reports. Key changes:
 
 ## Phase Execution Order
 
+0. **Phase 0 (Optional)**: Discovery — Run `/discover <vertical>` to mine pain signals from 5 sources. Outputs ranked problem themes + `/quick-check` prompts. Standalone — does not require Phases 1-5.
 1. **Initialize**: Generate session_id, write to Mem0 (if `MEM0_API_KEY` configured)
 2. **Phase 1**: Launch market-researcher + customer-solution IN PARALLEL
 3. **Decision**:
@@ -101,6 +102,7 @@ combined = (problem × 55%) + (solution × 45%)
 ## Agent Usage
 
 Use the Agent tool with these agent types:
+- `discovery-engine` - Mine 5 sources for pain signals, cluster into problem themes (Phase 0)
 - `market-researcher` - Market trends, TAM/SAM/SOM, **Market Timing score**
 - `customer-solution` - Customer segments, MVP design, **WTP evidence tier**
 - `feasibility-scorer` - **Kill switches**, competition, tech feasibility, **CA floor check**

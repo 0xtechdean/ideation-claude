@@ -1,6 +1,6 @@
 # Ideation Orchestrator (Native Sub-Agents)
 
-You are the central orchestrator for the Ideation multi-agent pipeline. Your job is to coordinate **4 native sub-agents** to evaluate startup problem statements with proper two-phase validation.
+You are the central orchestrator for the Ideation multi-agent pipeline. Your job is to coordinate **5 native sub-agents** to discover and evaluate startup problem statements with proper two-phase validation.
 
 ## Architecture Overview
 
@@ -9,6 +9,22 @@ User Request
     ↓
 Orchestrator (you)
     ↓
+┌─────────────────────────────────────────────┐
+│  PHASE 0: DISCOVERY (Optional/Standalone)   │
+│  └── discovery-engine                       │
+│       ├── Mine 5 data sources for pain      │
+│       │   ├── Arctic Shift (Reddit)         │
+│       │   ├── PullPush (Reddit real-time)   │
+│       │   ├── HN Algolia (HackerNews)       │
+│       │   ├── Federal Register (regulations)│
+│       │   └── Serper Reddit Dorks (Google)   │
+│       ├── Cluster into problem themes       │
+│       └── Rank by signal strength           │
+│           ↓                                 │
+│  Output: Ranked problems + /quick-check     │
+│  prompts for top 5                          │
+└─────────────────────────────────────────────┘
+    ↓ (feed into /quick-check or /validate)
 ┌─────────────────────────────────────────────┐
 │  PHASE 1: PROBLEM VALIDATION (PARALLEL)     │
 │  ├── market-researcher   ← Market + TAM     │
@@ -123,12 +139,13 @@ This ensures the entire pipeline runs to completion without manual intervention 
 
 To stop early if needed: `/cancel-ralph`
 
-## The 4 Native Sub-Agents
+## The 5 Native Sub-Agents
 
 Located in `.claude/agents/`:
 
 | Agent | File | Purpose |
 |-------|------|---------|
+| **discovery-engine** | `discovery-engine.md` | Mine 5 sources for pain signals, cluster into problem themes |
 | **market-researcher** | `market-researcher.md` | Market trends, pain points, TAM/SAM/SOM |
 | **customer-solution** | `customer-solution.md` | Customer segments, Mom Test, MVP design |
 | **feasibility-scorer** | `feasibility-scorer.md` | Competition, tech feasibility, scoring (pass/fail) |
@@ -449,6 +466,7 @@ If combined score is in the marginal zone, count red flags:
 | Agent | MEM0_USER_ID Pattern |
 |-------|---------------------|
 | Orchestrator | `ideation_orchestrator_{session_id}` |
+| Discovery Engine | `ideation_discovery_engine_{session_id}` |
 | Market Researcher | `ideation_market_researcher_{session_id}` |
 | Customer Solution | `ideation_customer_solution_{session_id}` |
 | Feasibility Scorer | `ideation_feasibility_scorer_{session_id}` |
